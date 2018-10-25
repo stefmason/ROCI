@@ -11,8 +11,9 @@ library(dplyr)
 library (ggplot2)
 library(survival)
 library(survminer)
+library(QuantPsyc)
 ```
-```{r load data, message=FALSE, warnings=FALSE, echo=FALSE}
+```{r load data, message=FALSE, echo=FALSE}
 #Load outcomes data
 outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", col_types = c("numeric", "skip", "numeric", "numeric", "numeric", "numeric", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "date", "date", "numeric", "numeric", "date", "date",  "numeric", "date", "date", "numeric", "text", "numeric", "text", "numeric", "numeric", "date", "numeric", "numeric", "text", "numeric", "text", "text"))
 #Load imaging/score data
@@ -27,10 +28,11 @@ images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imagi
 <br> - Total CXR score IS predictive of time-to-death ina Cox proportional hazards model
 <br> - Total CXR score IS predictive of ICU LOS and duration of MV
 <br>
+
 ```{r filter data}
 #Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
-admit <- filter(images, Final_Dx != "Control", admit_cxr == 1) %>% select(Subject_ID, cxr_date, Quad1, Quad2, Quad3, Quad4, Total)
-imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% select (Subject_ID, Male, Age, BMI, non_white, Immsupp, APACHE, SOFA, days_MV, ICU_admit, ICU_days, Hosp_admit, Hosp_days, Final_Dx, DC_coded, hosp_death, date_death, mort28d, mort60d) %>% merge(admit, by="Subject_ID")
+admit <- filter(images, Final_Dx != "Control", admit_cxr == 1) %>% dplyr::select(Subject_ID, cxr_date, Quad1, Quad2, Quad3, Quad4, Total)
+imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% dplyr::select (Subject_ID, Male, Age, BMI, non_white, Immsupp, APACHE, SOFA, days_MV, ICU_admit, ICU_days, Hosp_admit, Hosp_days, Final_Dx, DC_coded, hosp_death, date_death, mort28d, mort60d) %>% merge(admit, by="Subject_ID")
 
 # 207/559 subjects are immunosuppressed
 # 286/559 subjects have a BMI recorded
@@ -46,32 +48,42 @@ imgs$mort60d <- as.factor(imgs$mort60d)
 ```
 
 <br>**In-hospital mortality**: With the exception of age and gender, all of the covariates are significant predictors of in hospital death and none of them appear to be colinear or confounding. Notably, total CXR score remains significant even when adjusting for APACHE score and immunosuppression status. 
-```{r logit in-hospital mortality}
+```{r logit in-hospital mortality, warning=FALSE}
 #In-hospital mortality
 hosp_mort <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(hosp_mort)
 
-#Table of univariable analysis
-univariable <- data_frame(var = c("total", "Age", "non_white", "immsupp", "APACHEII", "Male"), beta_tot = c(.1221, .12199, .11805, .10926, .11156, .12221), std_err_tot = c(.0234, .0234, .02378, .02454, .02448, .0234), pval_tot = c("<<.01", "<<.01", "<<.01", "<<.01", "<<.01", "<<.01"), AIC = c(614.3, 616.28, 602.97, 569.72, 583.11, 616.3), pval_var = c(NA, .907, .0008, "<<.01", "<<.01", .977), comment = c("predictor", "not sig", "predictor", "predictor", "predictor", "not sig"))
-univariable
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+
 ```
+
 <br>**28-day mortality**: Age and gender are no longer predictive, but Total CXR score remains significant even when Immunosuppression and APACHE are adjusted for. 
 
 ```{r logit 28d mortality}
 one_month <- glm(mort28d ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(one_month)
+
+cbind(OR = exp(coef(one_month)),
+      exp(confint(one_month)),
+      p = coef(summary(one_month))[,4])
 ```
 <br>**60-day mortality**: Age and gender are no longer predictive, but Total CXR score remains significant even when Immunosuppression and APACHE are adjusted for. 
 
 ```{r logit 60d mortality}
 two_month <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(two_month)
+
+cbind(OR = exp(coef(two_month)),
+      exp(confint(two_month)),
+      p = coef(summary(two_month))[,4])
 ```
 <br>**Time to death/Cox model**:  The total CXR score is the only predictive covariate in a cox proportional hazards model. 
 ```{r cox proportional hazards}
 refdate <- as.Date("2018-09-15")
 #Create variables with survival (in days) and a binary indicating censored status
-imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 1, 0))
+imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
 
 #Cox regression model
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
@@ -80,19 +92,59 @@ summary(cox_all)
 **Cox by quartile**: 
 ```{r quartiles}
 imgs <- imgs %>% mutate(quartile = ntile(Total,4))
-cox_quart <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs)
-summary(cox_quart)
-ggsurvplot(survfit(cox_quart), data=imgs, risk.table=TRUE, ggtheme=theme_minimal())
+cox_qt <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs)
+summary(cox_qt)
+ggsurvplot(survfit(cox_qt), data=imgs, risk.table=TRUE, ggtheme=theme_minimal())
 ```
 <br>**Other outcome measures**: Total (along with APACHE, age, and race) are predictive of both ICU LOS and duration of MV (in a simple linear regression model with a non-transformed outcome).
-```{r other outcomes}
+```{r ICU LOS, warning=FALSE}
 #Length of ICU stay
 ICUdays <- glm(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
 summary(ICUdays)
+#Standardized betas
+lm.beta(ICUdays)
+```
 
+```{r mechanical ventilation, warning=FALSE}
 #Duration of mechanical ventilation
 mvdays <- glm(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(ICUdays)
+summary(mvdays)
+#Standardized betas
+lm.beta(mvdays)
+```
+
+```{r negative binomial, warning=FALSE}
+#good for count data with lots of zeros (eg duration of MV)
+#library(pscl)
+#library(MASS)
+#library(boot)
+
+#look at the data - we see that zero is over-represented and the data are highly non-normal (bad for OLS) with a wide dispersion (bad for zero-inflated Poisson).
+#ggplot(aes(days_MV), data=imgs) + geom_histogram(binwidth = 2)
+
+#zinb <- zeroinfl(days_MV ~ Total | non_white+Male+APACHE+Immsupp, data=imgs, dist="negbin", EM=TRUE)
+#summary(zinb)
+```
+```{r}
+imgs %>% summarise(mean = mean(Total), stddev = sd(Total))
+```
+```{r}
+competent <- imgs %>% filter(Immsupp == 0)
+compromised <- imgs %>% filter(Immsupp == 1)
+
+hosp_mort <- glm(hosp_death ~ Total+Male+Age+APACHE+non_white, family=binomial(link='logit'), data=competent)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+
+hosp_mort <- glm(hosp_death ~ Total+Male+Age+APACHE+non_white, family=binomial(link='logit'), data=compromised)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
 ```
 
 

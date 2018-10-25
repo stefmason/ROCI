@@ -109,16 +109,16 @@ summary(two_month)
 ```{r cox proportional hazards}
 refdate <- as.Date("2018-09-15")
 #Create variables with survival (in days) and a binary indicating censored status
-ards <- mutate(ards, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 1, 0))
+ards <- mutate(ards, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
 
 #Cox regression model
-cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=ards)
+cox_all <- coxph(Surv(survival, censor) ~ Total, data=ards)
 summary(cox_all)
 
 #Including only immunocompetent
-competent <- mutate(competent, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 1, 0))
+competent <- mutate(competent, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
 
-cox_comp <- coxph(Surv(survival, censor) ~ Male+Age+APACHE+Total, data=competent)
+cox_comp <- coxph(Surv(survival, censor) ~ Total, data=competent)
 summary(cox_comp)
 ```
 
@@ -149,6 +149,9 @@ mvdays <- glm(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=ards)
 summary(ICUdays)
 mvdays <- glm(days_MV ~ Total+APACHE+Age+non_white+Male, data=competent)
 summary(ICUdays)
+```
+```{r work}
+temp <-ards %>% filter(is.na(date_death)==T)
 ```
 
 
