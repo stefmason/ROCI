@@ -3,6 +3,7 @@ title: "Regression: Full cohort"
 author: "S. Mason"
 date: "10/23/2018"
 output: html_document
+  code_folding: hide
 ---
 
 ```{r setup, echo=FALSE, message=FALSE}
@@ -91,11 +92,28 @@ summary(cox_all)
 ```
 **Cox by quartile**: 
 ```{r quartiles}
-imgs <- imgs %>% mutate(quartile = ntile(Total,4))
-cox_qt <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs)
-summary(cox_qt)
+#create quartiles
+imgs <- imgs %>% mutate(quartile = ntile(Total,4)) 
+imgs$quartile <- as.factor(imgs$quartile)
+#Create factor of upper three quartiles (vs lowest)
+imgs <- imgs %>% mutate( upthree = ifelse(quartile == 1, 0, 1))
+imgs$upthree = as.factor(imgs$upthree)
+#Cox regressions
+cox_qt <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+strata(quartile), data=imgs) #for graph
+cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+upthree, data=imgs) #for betas
+summary(cox_quart)
+
 ggsurvplot(survfit(cox_qt), data=imgs, risk.table=TRUE, ggtheme=theme_minimal())
 ```
+```{r in-hosp mort by quartile}
+hosp_mort <- glm(hosp_death ~ upthree+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+```
+
 <br>**Other outcome measures**: Total (along with APACHE, age, and race) are predictive of both ICU LOS and duration of MV (in a simple linear regression model with a non-transformed outcome).
 ```{r ICU LOS, warning=FALSE}
 #Length of ICU stay
@@ -128,7 +146,8 @@ lm.beta(mvdays)
 ```{r}
 imgs %>% summarise(mean = mean(Total), stddev = sd(Total))
 ```
-```{r}
+
+```{r in-hospital mortality: subgroup by immunosuppression}
 competent <- imgs %>% filter(Immsupp == 0)
 compromised <- imgs %>% filter(Immsupp == 1)
 
@@ -146,5 +165,14 @@ cbind(OR = exp(coef(hosp_mort)),
       exp(confint(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
+
+```{r cox survival: subgroup by immunosuppression}
+cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Total, data=competent)
+summary(cox_all)
+
+cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Total, data=compromised)
+summary(cox_all)
+```
+
 
 
