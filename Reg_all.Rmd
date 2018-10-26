@@ -3,7 +3,6 @@ title: "Regression: Full cohort"
 author: "S. Mason"
 date: "10/23/2018"
 output: html_document
-  code_folding: hide
 ---
 
 ```{r setup, echo=FALSE, message=FALSE}
@@ -23,6 +22,7 @@ images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imagi
 
 <h3>Analysis of the non-control cohort who have a CXR from MICU admit (n=559)</h3>
 **TLDR**:
+<br>Total CXR score is predictive in a threshold fashion. Once separated into the lowest quartile and the upper three quartiles, it is no longer predictive (of in-hospital mortality).
 <br> - Total CXR score IS predictive of in-hospital mortality, even when adjusted for APACHE score and immunosuppression
 <br> - Total CXR score IS predictive of 28-day mortality, even when adjusted for APACHE score and immunosuppression
 <br> - Total CXR score IS predictive of 60-day mortality, even when adjusted for APACHE score and immunosuppression
@@ -146,6 +146,26 @@ lm.beta(mvdays)
 ```{r}
 imgs %>% summarise(mean = mean(Total), stddev = sd(Total))
 ```
+
+```{r per point for quartile subgroups}
+quart1 <- imgs %>% filter(upthree == 0)
+quart234 <- imgs %>% filter(upthree == 1)
+
+hosp_mort <- glm(hosp_death ~ Total+Male+Age+APACHE+Immsupp+non_white, family=binomial(link='logit'), data=quart1)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+
+hosp_mort <- glm(hosp_death ~ Total+Male+Age+Immsupp+non_white, family=binomial(link='logit'), data=quart234)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+```
+
 
 ```{r in-hospital mortality: subgroup by immunosuppression}
 competent <- imgs %>% filter(Immsupp == 0)
