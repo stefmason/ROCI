@@ -37,6 +37,7 @@ imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% dplyr::select (Su
 
 # 207/559 subjects are immunosuppressed
 # 286/559 subjects have a BMI recorded
+# 285/559 subjects were intubated
 ```
 ```{r more set-up, echo=FALSE}
 #Numerics to factor
@@ -89,6 +90,11 @@ imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(dif
 #Cox regression model
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
 summary(cox_all)
+
+#non-ARDS patients
+imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS")
+cox_all_non <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs_non)
+summary(cox_all_non)
 ```
 **Cox by quartile**: 
 ```{r quartiles}
@@ -102,8 +108,16 @@ imgs$upthree = as.factor(imgs$upthree)
 cox_qt <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+strata(quartile), data=imgs) #for graph
 cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+upthree, data=imgs) #for betas
 summary(cox_quart)
-
-ggsurvplot(survfit(cox_qt), data=imgs, risk.table=TRUE, ggtheme=theme_minimal())
+```
+```{r Kaplan Meier}
+ggsurvplot(survfit(cox_qt), data=imgs, 
+           ggtheme = theme_minimal(), legend.title="Quartile",
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,3650), break.x.by=365,
+           title="Survival by CXR score quartile", xlab="Time (days)",
+           legend="right",
+           risk.table.fontsize=3, risk.table.title="") 
+  
 ```
 ```{r in-hosp mort by quartile}
 hosp_mort <- glm(hosp_death ~ upthree+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
@@ -114,24 +128,53 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
-<br>**Other outcome measures**: Total (along with APACHE, age, and race) are predictive of both ICU LOS and duration of MV (in a simple linear regression model with a non-transformed outcome).
+<br>**Other outcome measures**: Total is predictive of ICU LOS and duration of MV 
 ```{r ICU LOS, warning=FALSE}
-#Length of ICU stay
-ICUdays <- glm(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(ICUdays)
-#Standardized betas
-lm.beta(ICUdays)
+contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
+
+#Negative binomial model
+ICUdays_nb <- glm.nb(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(ICUdays_nb)
+cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
+
+ICUdays_nbq <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(ICUdays_nbq)
+cbind(IRR = exp(coef(ICUdays_nbq)), exp(confint(ICUdays_nbq)))[2:4,]
 ```
 
 ```{r mechanical ventilation, warning=FALSE}
-#Duration of mechanical ventilation
-mvdays <- glm(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(mvdays)
-#Standardized betas
-lm.beta(mvdays)
+
+#Negative binomial model
+MVdays_nb <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(MVdays_nb)
+cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
+
+MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(MVdays_nbq)
+cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
 ```
 
-```{r negative binomial, warning=FALSE}
+```{r boxplot}
+library(reshape2)
+library(RColorBrewer)
+#Eliminate non-intubated from the MV data and transform for plotting
+meltICU <- imgs %>% dplyr::select(Subject_ID, ICU_days, quartile) %>% melt(id.vars="quartile", measure.vars="ICU_days")
+meltMV <- imgs %>% filter(days_MV != 0) %>% dplyr::select(Subject_ID, days_MV, quartile) %>% melt(id.vars="quartile", measure.vars="days_MV")
+meltplot <- rbind(meltICU, meltMV)
+
+#Generate the boxplot
+ggplot(meltplot) + geom_boxplot(aes(quartile, value, color=variable, fill=quartile, line=quartile)) +   
+  scale_x_discrete(name="CXR Score Quartile") + 
+  scale_y_sqrt(name="Days", breaks=c(0,4,9,16,25,36,49,64,81)) +
+  ggtitle("Duration of Mechanical Ventilation & ICU Length of Stay") +
+  theme_minimal() + theme(plot.title = element_text(face = "bold")) +
+  theme(panel.grid.minor = element_blank()) + 
+  guides(color=guide_legend(title = "Outcome"))
+
+```
+
+
+```{r zero-inflated negative binomial, warning=FALSE}
 #good for count data with lots of zeros (eg duration of MV)
 #library(pscl)
 #library(MASS)
@@ -143,9 +186,7 @@ lm.beta(mvdays)
 #zinb <- zeroinfl(days_MV ~ Total | non_white+Male+APACHE+Immsupp, data=imgs, dist="negbin", EM=TRUE)
 #summary(zinb)
 ```
-```{r}
-imgs %>% summarise(mean = mean(Total), stddev = sd(Total))
-```
+
 
 ```{r per point for quartile subgroups}
 quart1 <- imgs %>% filter(upthree == 0)
