@@ -12,6 +12,7 @@ library (ggplot2)
 library(survival)
 library(survminer)
 library(QuantPsyc)
+library(gridExtra)
 ```
 ```{r load data, message=FALSE, echo=FALSE}
 #Load outcomes data
@@ -90,12 +91,27 @@ imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(dif
 #Cox regression model
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
 summary(cox_all)
+```
 
+```{r Cox regression for non ARDS}
 #non-ARDS patients
-imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS")
-cox_all_non <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs_non)
+imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = ntile(Total,4))
+cox_all_non <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+strata(quartile), data=imgs_non)
 summary(cox_all_non)
 ```
+
+```{r KM for non ARDS}
+plot_non <- ggsurvplot(survfit(cox_all_non), data=imgs_non, 
+           ggtheme = theme_minimal(), legend.title="Quartile", 
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
+           xlab="Months", font.legend=8, title="non-ARDS patients", font.title=10,
+           legend="none", risk.table.y.text=FALSE, 
+           risk.table.fontsize=3, risk.table.title="") 
+plot_non$plot <- plot_non$plot + theme(axis.text.y = element_blank(), plot.title = element_text(hjust = 0.5))
+plot_non
+```
+
 **Cox by quartile**: 
 ```{r quartiles}
 #create quartiles
@@ -109,15 +125,23 @@ cox_qt <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+strat
 cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+upthree, data=imgs) #for betas
 summary(cox_quart)
 ```
-```{r Kaplan Meier}
-ggsurvplot(survfit(cox_qt), data=imgs, 
-           ggtheme = theme_minimal(), legend.title="Quartile",
+
+```{r Kaplan Meier all subjects}
+plot_all <- ggsurvplot(survfit(cox_qt), data=imgs, 
+           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
-           xlim=c(0,3650), break.x.by=365,
-           title="Survival by CXR score quartile", xlab="Time (days)",
-           legend="right",
+           xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
+           xlab="Months", font.legend=8, title="entire cohort", font.title=10,
+           legend=c(1.1,0.6), risk.table.y.text=FALSE,
            risk.table.fontsize=3, risk.table.title="") 
-  
+plot_all$plot <- plot_all$plot + theme(plot.title = element_text(hjust = 0.5))
+plot_all
+```
+```{r arrange the plots}
+KM_curves <- list()
+KM_curves[[1]] <- plot_all
+KM_curves[[2]] <- plot_non
+arrange_ggsurvplots(KM_curves, print=TRUE, title="Survival by CXR score quartile", ncol=2, nrow=1)
 ```
 ```{r in-hosp mort by quartile}
 hosp_mort <- glm(hosp_death ~ upthree+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
@@ -137,9 +161,9 @@ ICUdays_nb <- glm.nb(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=im
 summary(ICUdays_nb)
 cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
 
-ICUdays_nbq <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(ICUdays_nbq)
-cbind(IRR = exp(coef(ICUdays_nbq)), exp(confint(ICUdays_nbq)))[2:4,]
+#ICUdays_nbq <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+#summary(ICUdays_nbq)
+#cbind(IRR = exp(coef(ICUdays_nbq)), exp(confint(ICUdays_nbq)))[2:4,]
 ```
 
 ```{r mechanical ventilation, warning=FALSE}
@@ -149,9 +173,15 @@ MVdays_nb <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs
 summary(MVdays_nb)
 cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
 
-MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(MVdays_nbq)
-cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
+#only intubated patients
+intub <- imgs %>% filter(days_MV != 0)
+MVdays_nb2 <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=intub)
+summary(MVdays_nb2)
+cbind(IRR = exp(coef(MVdays_nb2)), exp(confint(MVdays_nb2)))[2,]
+
+#MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+#summary(MVdays_nbq)
+#cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
 ```
 
 ```{r boxplot}
