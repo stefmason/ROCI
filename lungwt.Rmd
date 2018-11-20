@@ -1,0 +1,31 @@
+---
+title: "Lung Weights"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: flatly
+---
+```{r setup, echo=FALSE, message=FALSE}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(survival)
+library(survminer)
+library(QuantPsyc)
+library(gridExtra)
+knitr::opts_chunk$set(message = FALSE)
+```
+```{r load data, echo=FALSE}
+#Load outcomes data
+demo <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:9), col_types = c("numeric", "skip", "skip", "numeric", "numeric", "skip", "text", "numeric", "numeric"))
+#Load imaging/wt data
+weights <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "LungWt", col_types = c("numeric", "date", "date", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "skip"))
+
+#Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
+#admit <- filter(images, Final_Dx != "Control", admit_cxr == 1) %>% dplyr::select(Subject_ID, cxr_date, Quad1, Quad2, Quad3, Quad4, Total)
+#imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% dplyr::select (Subject_ID, Male, Age, BMI, non_white, Immsupp, APACHE, SOFA, days_MV, ICU_admit, ICU_days, Hosp_admit, Hosp_days, Final_Dx, DC_coded, hosp_death, date_death, mort28d, mort60d) %>% merge(admit, by="Subject_ID")
+
+```

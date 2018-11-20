@@ -1,11 +1,11 @@
 ---
-title: "Table1"
-author: "S. Mason"
-date: "10/4/2018"
+title: "ROCI Analysis"
+author: "Stefanie Mason"
+date: "11/16/2018"
 output: 
-  html_document:
+  html_document: 
     code_folding: hide
-    toc: True
+    toc: true
     toc_depth: 2
     toc_floating: true
     theme: flatly
@@ -25,21 +25,4 @@ library(gridExtra)
 outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", col_types = c("numeric", "skip", "numeric", "numeric", "numeric", "numeric", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "date", "date", "numeric", "numeric", "date", "date",  "numeric", "date", "date", "numeric", "text", "numeric", "text", "numeric", "numeric", "date", "numeric", "numeric", "text", "numeric", "text", "text"))
 #Load imaging/score data
 images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", col_types = c("numeric", "text", "date", "numeric", "date", "numeric", "numeric", "numeric", "date", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "skip"))
-
-#Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
-admit <- filter(images, Final_Dx != "Control", admit_cxr == 1) %>% dplyr::select(Subject_ID, cxr_date, Quad1, Quad2, Quad3, Quad4, Total)
-imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% dplyr::select (Subject_ID, Male, Age, BMI, non_white, Immsupp, APACHE, SOFA, days_MV, ICU_admit, ICU_days, Hosp_admit, Hosp_days, Final_Dx, DC_coded, hosp_death, date_death, mort28d, mort60d) %>% merge(admit, by="Subject_ID")
-
-# 207/559 subjects are immunosuppressed
-# 286/559 subjects have a BMI recorded
-# 285/559 subjects were intubated
-
-#Numerics to factor
-imgs$Male <- as.factor(imgs$Male)
-imgs$non_white <- as.factor(imgs$non_white)
-imgs$Immsupp <- as.factor(imgs$Immsupp)
-imgs$hosp_death <- as.factor(imgs$hosp_death)
-imgs$mort28d <- as.factor(imgs$mort28d)
-imgs$mort60d <- as.factor(imgs$mort60d)
 ```
-#Demographic characteristics
