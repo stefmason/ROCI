@@ -10,22 +10,54 @@ output:
 ---
 ```{r setup, echo=FALSE, message=FALSE}
 library(readxl)
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
 library(survival)
-library(survminer)
-library(QuantPsyc)
+library(olsrr)
 library(gridExtra)
-knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
-```{r load data, echo=FALSE}
-#Load outcomes data
-demo <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:9), col_types = c("numeric", "skip", "skip", "numeric", "numeric", "skip", "text", "numeric", "numeric"))
-#Load imaging/wt data
-weights <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "LungWt", col_types = c("numeric", "date", "date", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "skip"))
+### Loading Data
+```{r load data}
+#Load demographic data for gender
+demo <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:4), col_types = c("numeric", "skip", "skip", "numeric"))
 
-#Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
-#admit <- filter(images, Final_Dx != "Control", admit_cxr == 1) %>% dplyr::select(Subject_ID, cxr_date, Quad1, Quad2, Quad3, Quad4, Total)
-#imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% dplyr::select (Subject_ID, Male, Age, BMI, non_white, Immsupp, APACHE, SOFA, days_MV, ICU_admit, ICU_days, Hosp_admit, Hosp_days, Final_Dx, DC_coded, hosp_death, date_death, mort28d, mort60d) %>% merge(admit, by="Subject_ID")
+#Load imaging/weight data and merge
+weights <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "LungWt", range = cell_cols(1:12)) %>% 
+  gather(side, weight, r_lung_wt:l_lung_wt) %>%
+  mutate(side = ifelse(side == "r_lung_wt", "right", "left"), side_total = ifelse(side == "right", quad1+quad3, quad2+quad4)) %>%
+  filter(wi_24h == 1) %>%
+  left_join(., demo, by = "Subject_ID") %>% 
+  mutate(Male = as.factor(Male))
 
 ```
+
+## Analysis
+### Spearman
+<p>Our Spearman is much lower than that reported in the RALE study, however they had much lower avg lung weights (median 797g). They reported rho = 0.59 for all explants and rho = 0.73 for the heavy subset. 
+```{r spearman correlation}
+cor.test(weights$side_total, weights$weight, method = "spearman")
+
+rale_weights <- weights %>% filter(weight > 797)
+cor.test(rale_weights$side_total, rale_weights$weight, method = "spearman")
+```
+
+### Linear regression
+<p>Based on the residual diagnostics, it is reasonable to use linear regression despite the data being non-normal (below). This allows us to control for the confounders of height and gender on lung weight. 
+```{r linear regression}
+weights %>% ggplot(aes(side_total, weight, color = side)) + geom_point() + geom_smooth(method = "lm")
+
+wt <- lm(weight ~ side_total+height+Male, data = weights)
+summary(wt)
+
+#check normality of errors
+ols_plot_resid_qq(wt)
+ols_test_correlation(wt)
+```
+
+## Testing for normality
+<p> The data are non-normal.
+```{r normality test}
+shapiro.test(weights$weight)
+weights %>% ggplot(aes(weight)) + geom_histogram()
+```
+
