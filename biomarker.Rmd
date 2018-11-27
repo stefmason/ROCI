@@ -1,0 +1,79 @@
+---
+title: "Biomarkers"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+---
+```{r setup, echo=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(data.table)
+library(olsrr)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+### Import data
+```{r import data}
+#Imaging/score data
+images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", range = cell_cols(1:16))
+images <- images %>% dplyr::select(Subject_ID, Final_Dx, ICU_admit, Intub_date, admit_cxr, Total) %>% rename(score = Total) %>% mutate(Final_Dx = as.factor(Final_Dx)) %>%
+  filter(admit_cxr == 1)
+
+#Biomarker data
+biomarker <- read_csv("~/Documents/ROCIanalysis/IL18_mtDNA.csv")
+biomarker <- biomarker %>% dplyr::select(SID, Date_bld_draw, IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate) %>% 
+  rename(Subject_ID = SID, blood_date = Date_bld_draw) %>%
+  filter(!is.na(blood_date)) %>% mutate(blood_date = as.Date(blood_date, "%m/%d/%Y")) %>% 
+  left_join(images, by = "Subject_ID") %>% filter(admit_cxr == 1)
+
+#Pull APACHE score in from outcomes data
+outcome <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:10))
+outcome <- outcome %>% dplyr::select(Subject_ID, APACHE) %>% right_join(biomarker)
+rm(outcome)
+```
+
+### Summary stats
+```{r summary stats}
+#subjects with both a scored CXR and a given biomarker
+markers <- biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, Lactate)
+
+#define functions to accomodate missing data
+count_rows <- function(x){
+  NROW(na.omit(x))
+}
+max_val <- function(x){
+  max(na.omit(x))
+}
+min_val <- function(x){
+  min(na.omit(x))
+}
+
+#Build the summary table
+sum_stat <- data.table(IL18D0=double(), nadh_copies=double(), HMITO_38=double(), HMITO_96=double(), Lactate=double())
+sum_stat <- rbind(sum_stat, t(apply(markers, 2, count_rows)))
+sum_stat <- rbind(sum_stat, t(apply(markers, 2, max_val)))
+sum_stat <- rbind(sum_stat, t(apply(markers, 2, min_val)))
+sum_stat <- cbind(sum_stat, c("n", "max", "min"))
+sum_stat <- sum_stat[,c(6,1,2,3,4,5)]
+sum_stat
+```
+
+### Visualize data
+## Scatterplot
+```{r scatterplot}
+biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>% 
+  ggplot(aes(score, value)) + geom_point() + scale_y_log10() + facet_grid(.~marker) + ylab("value (log scale)") + xlab("Total CXR score")
+
+#To check the integrity of the gather, name the data and check against:
+#vert %>% group_by(marker) %>% summarize(count = length(marker)) #check that the gather did not lose any data
+```
+
+```{r regression}
+
+IL18 <- lm(IL18D0 ~ score)
+```
+
+

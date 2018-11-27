@@ -5,7 +5,7 @@ output:
     code_folding: hide
     toc: true
     toc_float: true
-    toc_depth: 2
+    toc_depth: 3
     theme: flatly
 ---
 ```{r setup, echo=FALSE, message=FALSE}
@@ -31,13 +31,28 @@ weights <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Lung
 
 ```
 
-## Analysis
+# Analysis
+
+### Summary Statistics
+<p> Our lungs appear to be slightly heavier than those included in the RALE sample.
+```{r summary stats}
+summ <- weights %>% summarise(mean = mean(weight, na.rm=T), median = median(weight, na.rm=T)) 
+summ
+```
+
+###Testing for normality
+<p> The data are non-normal.
+```{r normality test}
+shapiro.test(weights$weight)
+weights %>% ggplot(aes(weight)) + geom_histogram()
+```
+
 ### Spearman
-<p>Our Spearman is much lower than that reported in the RALE study, however they had much lower avg lung weights (median 797g). They reported rho = 0.59 for all explants and rho = 0.73 for the heavy subset. 
+<p>Our Spearman is much lower than that reported in the RALE study. They reported rho = 0.59 for all explants and rho = 0.73 for the heavy subset. 
 ```{r spearman correlation}
 cor.test(weights$side_total, weights$weight, method = "spearman")
 
-rale_weights <- weights %>% filter(weight > 797)
+rale_weights <- weights %>% filter(weight > 910)  #spearman on those greater than the median
 cor.test(rale_weights$side_total, rale_weights$weight, method = "spearman")
 ```
 
@@ -54,10 +69,5 @@ ols_plot_resid_qq(wt)
 ols_test_correlation(wt)
 ```
 
-## Testing for normality
-<p> The data are non-normal.
-```{r normality test}
-shapiro.test(weights$weight)
-weights %>% ggplot(aes(weight)) + geom_histogram()
-```
+
 
