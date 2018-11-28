@@ -11,6 +11,7 @@ output:
 ```{r setup, echo=FALSE, message=FALSE}
 library(readxl)
 library(tidyverse)
+library(broom)
 library(data.table)
 library(olsrr)
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
@@ -31,9 +32,15 @@ biomarker <- biomarker %>% dplyr::select(SID, Date_bld_draw, IL18D0, nadh_copies
 
 #Pull APACHE score in from outcomes data
 outcome <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:10))
-outcome <- outcome %>% dplyr::select(Subject_ID, APACHE) %>% right_join(biomarker)
-rm(outcome)
+outcome <- outcome %>% dplyr::select(Subject_ID, APACHE) 
+biomarker <- biomarker %>% left_join(outcome, by = "Subject_ID")
 ```
+
+<p>Per Circulating mitochondrial DNA in patients in the ICU as a marker of mortality: derivation and validation (PLoS Med 2013):
+<br>mtDNA = human NADH dehydrogenase 1 gene (represented in this data as **nadh_copies**)
+<br>nuclear DNA = human B-globin (represented in this data as **bglob**)
+<br>Innate immune response (represented in this data by **IL18D0**, meaning collected wi 48H admission)
+<br>
 
 ### Summary stats
 ```{r summary stats}
@@ -64,16 +71,33 @@ sum_stat
 ### Visualize data
 ## Scatterplot
 ```{r scatterplot}
-biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>% 
+biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>% 
   ggplot(aes(score, value)) + geom_point() + scale_y_log10() + facet_grid(.~marker) + ylab("value (log scale)") + xlab("Total CXR score")
 
 #To check the integrity of the gather, name the data and check against:
 #vert %>% group_by(marker) %>% summarize(count = length(marker)) #check that the gather did not lose any data
 ```
 
-```{r regression}
-
-IL18 <- lm(IL18D0 ~ score)
+## Test for normality
+```{r}
+shapiro.test(biomarker$IL18D0)
+shapiro.test(biomarker$nadh_copies)
+shapiro.test(biomarker$HMITO_38)
+shapiro.test(biomarker$HMITO_96)
 ```
+
+## Regressions
+```{r univariate regression}
+biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>%
+  group_by(marker) %>% do(tidy(lm(value~score, data = .))) %>% filter(term != "(Intercept)")
+
+```
+<p>The regression demonstrates that CXR score was only a significant predictor of HMITO_38.
+
+```{r multivariate regression}
+biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate, score, APACHE) %>% gather(marker, value, -score, -APACHE, na.rm=T) %>%
+  group_by(marker) %>% do(tidy(lm(value~score+APACHE, data = .))) %>% filter(term != "(Intercept)")
+```
+<p>While APACHE is a significant predictor of all the biomarkers (lactate is borderline), with APACHE in the model, the CXR is not significantly predictive of any biomarker.
 
 
