@@ -25,21 +25,53 @@ images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imagi
 ```
 ```{r}
 #Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
-demos <- images %>% filter(admit_cxr == 1) %>% left_join(outcomes, by="Subject_ID") %>% filter(Final_Dx != "Control")
+demos <- images %>% filter(admit_cxr == 1) %>% left_join(outcomes, by="Subject_ID") %>% filter(Final_Dx != "Control") %>% mutate(on_MV = ifelse(days_MV==0, 0, 1))
 ```
-```{r}
+```{r factors}
 #Numerics to factor
-demos$Male <- as.factor(demos$Male)
-demos$non_white <- as.factor(demos$non_white)
-demos$Immsupp <- as.factor(demos$Immsupp)
-demos$hosp_death <- as.factor(demos$hosp_death)
-demos$mort28d <- as.factor(demos$mort28d)
-demos$mort60d <- as.factor(demos$mort60d)
+demos$Male <- factor(demos$Male, levels=c(1,0), labels=c("Male", "Female"))
+demos$non_white <- factor(demos$non_white, levels=c(1,0), labels=c("Non-caucasian", "Caucasian"))
+demos$Immsupp <- factor(demos$Immsupp, levels = c(1,0), labels = c("Yes", "No"))
+demos$hosp_death <- factor(demos$hosp_death, levels = c(1,0), labels = c("Died", "Survived to discharge"))
+demos$mort28d <- factor(demos$mort28d, levels = c(1,0), labels = c("Died", "Survived >28 days"))
+demos$on_MV <- factor(demos$on_MV, levels = c(1,0), labels = c("Intubated", "no IPPV"))
+
 
 colnames(demos)
 ```
 
-```{r}
-labels <- list(variables=())
+```{r table1}
+label(demos$Age) <- "Age"
+label(demos$Male) <- "Male"
+label(demos$non_white) <- "Caucasian"
+label(demos$Immsupp) <-"Immunosuppressed"
+label(demos$APACHE) <- "APACHE II"
+label(demos$on_MV) <- "Intubated"
+label(demos$hosp_death) <- "In hospital mortality"
+label(demos$mort28d) <- "28-day mortality"
+
+units(demos$Age) <- "yrs"
+
+table1(~ Age + Male + non_white + Immsupp + APACHE + on_MV + hosp_death + mort28d, data=demos)
 ```
+
+```{r}
+labels <- list(
+  variables=list(Age="Age (yrs)", Male="Male", non_white="Caucasian", Immsupp="Immunosuppressed", APACHE="APACHE", on_MV="Intubated", hosp_death="In hospital mortality", mort28d="28 day mortality"))
+
+strata <- c(list(Overall=demos))
+
+my.render.cont <- function(x) {
+  with(stats.apply.rounding(stats.default(x), digits=2), c("", "Mean (SD)" = sprintf("%s (&plusmn; %s)", MEAN, SD)))
+}
+
+my.render.cat <- function(x) {
+  c("", sapply(stats.default(x), function(y) with(y, sprintf("%d (%0.0f %%)", FREQ, PCT))))
+}
+
+table1(strata, labels, render.continuous=my.render.cont, render.categorical=my.render.cat)
+```
+
+
+
 
