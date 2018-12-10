@@ -1,0 +1,28 @@
+---
+title: "ROCI Analysis"
+author: "Stefanie Mason"
+date: "11/16/2018"
+output: 
+  html_document: 
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    toc_floating: true
+    theme: flatly
+---
+
+```{r setup, echo=FALSE, message=FALSE}
+library(readxl)
+library(dplyr)
+library (ggplot2)
+library(survival)
+library(survminer)
+library(QuantPsyc)
+library(gridExtra)
+```
+```{r load data, message=FALSE, echo=FALSE}
+#Load outcomes data
+outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", col_types = c("numeric", "skip", "numeric", "numeric", "numeric", "numeric", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "date", "date", "numeric", "numeric", "date", "date",  "numeric", "date", "date", "numeric", "text", "numeric", "text", "numeric", "numeric", "date", "numeric", "numeric", "text", "numeric", "text", "text"))
+#Load imaging/score data
+images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", col_types = c("numeric", "text", "date", "numeric", "date", "numeric", "numeric", "numeric", "date", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "skip"))
+```
