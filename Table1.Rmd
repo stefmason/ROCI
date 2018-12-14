@@ -2,30 +2,47 @@
 title: "Table1"
 author: "S. Mason"
 date: "10/4/2018"
-output: 
+output:
   html_document:
     code_folding: hide
-    toc: True
-    toc_depth: 2
-    toc_floating: true
     theme: flatly
+    toc: yes
+    toc_depth: 2
+    toc_floating: yes
+  word_document:
+    toc: yes
+    toc_depth: '2'
 ---
 
 ```{r setup, echo=FALSE, message=FALSE}
 library(readxl)
-library(dplyr)
-library (ggplot2)
+library(tidyverse)
 library(table1)
+library(tableone)
+library(officer)
 ```
 ```{r load data, message=FALSE, echo=FALSE}
-#Load outcomes data
-outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", col_types = c("numeric", "skip", "numeric", "numeric", "numeric", "numeric", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "date", "date", "numeric", "numeric", "date", "date",  "numeric", "date", "date", "numeric", "text", "numeric", "text", "numeric", "numeric", "date", "numeric", "numeric", "text", "numeric", "text", "text"))
-#Load imaging/score data
-images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", col_types = c("numeric", "skip", "skip", "skip", "skip", "numeric", "skip", "skip", "skip", "skip", "skip", "skip", "skip", "skip", "numeric", "skip", "skip"))
+#Load data
+outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:27))
+imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", range = cell_cols(1:11))
+
+#RWarngle data
+outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male))
+
+imgs <- imgs %>% dplyr::select(-day_3_cxr, -day_5_cxr) %>% filter(admit_cxr == 1) %>% left_join(outcomes, by = "Subject_ID") %>% filter(Final_Dx != "Control") 
+
+#Numerics to factor
+imgs$mort28d <- as.factor(imgs$mort28d)
+imgs$mort60d <- as.factor(imgs$mort60d)
+
 ```
 ```{r}
+#temp <- images %>% filter(admit_cxr == 1) %>% left_join(outcomes, by="Subject_ID") %>% filter(Final_Dx != "Control")
+```
+
+```{r}
 #Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
-demos <- images %>% filter(admit_cxr == 1) %>% left_join(outcomes, by="Subject_ID") %>% filter(Final_Dx != "Control") %>% mutate(on_MV = ifelse(days_MV==0, 0, 1))
+demos <- imgs %>%  mutate(on_MV = ifelse(days_MV==0, 0, 1))
 ```
 ```{r factors}
 #Numerics to factor
@@ -52,7 +69,10 @@ label(demos$mort28d) <- "28-day mortality"
 
 units(demos$Age) <- "yrs"
 
-table1(~ Age + Male + non_white + Immsupp + APACHE + on_MV + hosp_death + mort28d, data=demos)
+Tbl1 <- table1(~ Age + Male + non_white + Immsupp + APACHE + on_MV + hosp_death + mort28d, data=demos)
+
+Tbl1
+
 ```
 
 ```{r}
@@ -72,6 +92,15 @@ my.render.cat <- function(x) {
 table1(strata, labels, render.continuous=my.render.cont, render.categorical=my.render.cat)
 ```
 
+```{r}
+vars=c("Age", "Male", "non_white", "Immsupp", "APACHE", "on_MV", "hosp_death", "mort_28d")
 
+#Tbl1 <- CreateTableOne(vars = vars, data = demos)
+```
+
+```{r}
+shapiro.test(imgs$Age)
+shapiro.test(imgs$APACHE)
+```
 
 
