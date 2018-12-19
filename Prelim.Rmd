@@ -89,13 +89,31 @@ summary(cox_all)
 #create quartiles
 imgs <- imgs %>% mutate(quartile = ntile(Total,4)) 
 imgs$quartile <- as.factor(imgs$quartile)
-#Create factor of upper three quartiles (vs lowest)
-imgs <- imgs %>% mutate( upthree = ifelse(quartile == 1, 0, 1))
-imgs$upthree = as.factor(imgs$upthree)
+
 #Cox regressions
 cox_qt <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+strata(quartile), data=imgs) #for graph
 cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+upthree, data=imgs) #for betas
 summary(cox_quart)
+```
+
+```{r pairwise quartile for Cox}
+contrasts(imgs$quartile) <- contr.treatment(4, base=4)
+cox_qt_base4 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs)
+summary(cox_qt_base4)
+#Result: Only Q1 is significant
+
+contrasts(imgs$quartile) <- contr.treatment(4, base=3)
+cox_qt_base3 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs)
+summary(cox_qt_base3)
+#Result: Only Q1 is significant
+
+contrasts(imgs$quartile) <- contr.treatment(4, base=2)
+cox_qt_base2 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs)
+summary(cox_qt_base2)
+#Result: Only Q1 is significant
+
+#reset factor to base 1
+contrasts(imgs$quartile) <- contr.treatment(4, base=1)
 ```
 
 ```{r Kaplan Meier all subjects}
@@ -113,9 +131,28 @@ plot_all
 ##Cox regression for non-ARDS subset
 ```{r Cox regression for non ARDS}
 #non-ARDS patients
-imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = ntile(Total,4))
-cox_all_non <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+strata(quartile), data=imgs_non)
+imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
+cox_all_non <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs_non)
 summary(cox_all_non)
+```
+```{r pairwise quartile non ARDS}
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=4)
+cox_non_base4 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs_non)
+summary(cox_non_base4)
+#Result: Only Q1 is significant
+
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=3)
+cox_non_base3 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs_non)
+summary(cox_non_base3)
+#Result: Only Q1 is significant
+
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=2)
+cox_non_base2 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs_non)
+summary(cox_non_base2)
+#Result: Only Q1 is significant
+
+#reset factor to base 1
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=1)
 ```
 
 ```{r KM for non ARDS}
@@ -135,15 +172,36 @@ plot_non
 KM_curves <- list()
 KM_curves[[1]] <- plot_all
 KM_curves[[2]] <- plot_non
-arrange_ggsurvplots(KM_curves, print=TRUE, title="Survival by CXR score quartile", ncol=2, nrow=1)
+arrange_ggsurvplots(KM_curves, print=TRUE, ncol=2, nrow=1)
 ```
+
 ```{r in-hosp mort by quartile}
-hosp_mort <- glm(hosp_death ~ upthree+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+hosp_mort <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(hosp_mort)
 
 cbind(OR = exp(coef(hosp_mort)),
       exp(confint(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
+```
+
+```{r pairwise in-hosp quartile evaluation}
+contrasts(imgs$quartile) <- contr.treatment(4, base=2)
+inhosp_quart_base2 <- glm(hosp_mort ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+summary(inhosp_quart_base2)
+#result: Q1is significant, 3 and 4 are not
+
+contrasts(imgs$quartile) <- contr.treatment(4, base=3)
+inhosp_quart_base3 <- glm(hosp_mort ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+summary(inhosp_quart_base3)
+#result: Q1 is significant, 2 and 4 are not
+
+contrasts(imgs$quartile) <- contr.treatment(4, base=4)
+inhosp_quart_base4 <- glm(hosp_mort ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+summary(inhosp_quart_base4)
+#result: Q1 is significant, 2 and 3 are not
+
+#reset factor to base 1
+contrasts(imgs$quartile) <- contr.treatment(4, base=1)
 ```
 
 ##ICU Length of stay
@@ -154,6 +212,11 @@ contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
 ICUdays_nb <- glm.nb(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
 summary(ICUdays_nb)
 cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
+
+#Translate into days (mean x IRR)
+incr_days = 1.057175 * mean(imgs$ICU_days)
+incr_days
+mean(imgs$ICU_days)
 
 #ICUdays_nbq <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
 #summary(ICUdays_nbq)
@@ -213,23 +276,12 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, value, color=variable, fill=quarti
 ```
 
 
-```{r per point for quartile subgroups}
-quart1 <- imgs %>% filter(upthree == 0)
-quart234 <- imgs %>% filter(upthree == 1)
+```{r survival stats}
+shapiro.test(imgs$survival)
 
-hosp_mort <- glm(hosp_death ~ Total+Male+Age+APACHE+Immsupp+non_white, family=binomial(link='logit'), data=quart1)
-summary(hosp_mort)
+imgs %>% summarize(mean = mean(survival), median = median(survival), min = min(survival), max = max(survival), count = length(survival))
 
-cbind(OR = exp(coef(hosp_mort)),
-      exp(confint(hosp_mort)),
-      p = coef(summary(hosp_mort))[,4])
-
-hosp_mort <- glm(hosp_death ~ Total+Male+Age+Immsupp+non_white, family=binomial(link='logit'), data=quart234)
-summary(hosp_mort)
-
-cbind(OR = exp(coef(hosp_mort)),
-      exp(confint(hosp_mort)),
-      p = coef(summary(hosp_mort))[,4])
+imgs %>% mutate(surv_quart = ntile(survival, 4)) %>% group_by(surv_quart) %>% summarize(mean = mean(survival), median = median(survival), min = min(survival), max = max(survival), count = length(survival))
 ```
 
 
