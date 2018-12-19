@@ -18,24 +18,16 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 ### Import data
 ```{r import data}
-#Pull APACHE score in from outcomes data
-outcome <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:23))
-outcome <- outcome %>% dplyr::select(Subject_ID, APACHE, Final_Dx) 
+biomarker <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet="markers", range = cell_cols(1:9))
 
-#Imaging/score data
-images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", range = cell_cols(1:16))
-images <- images %>% dplyr::select(Subject_ID, admit_cxr, Total) %>% rename(score = Total) %>%
-  filter(admit_cxr == 1) %>% left_join(outcome, by="Subject_ID") %>% filter(Final_Dx != "Control") %>% mutate(quartile = ntile(score,4))
-
-#Biomarker data
-biomarker <- read_csv("~/Documents/ROCIanalysis/IL18_mtDNA.csv")
-biomarker <- biomarker %>% dplyr::select(SID, Date_bld_draw, IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate) %>% 
-  rename(Subject_ID = SID, blood_date = Date_bld_draw) %>%
-  filter(!is.na(blood_date)) %>% mutate(blood_date = as.Date(blood_date, "%m/%d/%Y")) %>% 
-  right_join(images, by = "Subject_ID") 
+biomarker <- biomarker %>% dplyr::select(-UO_24) %>% rename(Subject_ID = SID) 
+biomarker <- imgs %>% dplyr::select(Subject_ID, Total, APACHE) %>% right_join(biomarker, by="Subject_ID")
 
 #log transforms
 biomarker <- biomarker %>% mutate(logIL18 = log10(IL18D0), logbglob = log10(bglob), lognadh = log10(nadh_copies), logh96 = log10(HMITO_96))
+
+#use the data frame created in the Prelim file -> load imgs (and run the cox regression)
+biomarker <- imgs %>% dplyr::select(Subject_ID, survival, censor) %>% right_join(biomarker, by="Subject_ID") 
 ```
 
 <p>Per Circulating mitochondrial DNA in patients in the ICU as a marker of mortality: derivation and validation (PLoS Med 2013):
@@ -47,7 +39,7 @@ biomarker <- biomarker %>% mutate(logIL18 = log10(IL18D0), logbglob = log10(bglo
 ### Summary stats
 ```{r summary stats}
 #subjects with both a scored CXR and a given biomarker
-markers <- biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate)
+markers <- biomarker %>% dplyr::select(IL18D0, nadh_copies, lognadh, HMITO_96, bglob, Lactate)
 
 #define functions to accomodate missing data
 count_rows <- function(x){
@@ -61,7 +53,7 @@ min_val <- function(x){
 }
 
 #Build the summary table
-sum_stat <- data.table(IL18D0=double(), nadh_copies=double(), HMITO_38=double(), HMITO_96=double(), bglob=double(), Lactate=double())
+sum_stat <- data.table(IL18D0=double(), nadh_copies=double(), lognadh=double(), HMITO_96=double(), bglob=double(), Lactate=double())
 sum_stat <- rbind(sum_stat, t(apply(markers, 2, count_rows)))
 sum_stat <- rbind(sum_stat, t(apply(markers, 2, max_val)))
 sum_stat <- rbind(sum_stat, t(apply(markers, 2, min_val)))
@@ -95,8 +87,6 @@ biomarker %>% dplyr::select(logIL18, lognadh, logbglob, quartile) %>% gather(mar
 ```{r normality}
 shapiro.test(biomarker$IL18D0)
 shapiro.test(biomarker$nadh_copies)
-shapiro.test(biomarker$HMITO_38)
-shapiro.test(biomarker$HMITO_96)
 shapiro.test(biomarker$bglob)
 shapiro.test(biomarker$Lactate)
 ```
@@ -106,7 +96,6 @@ shapiro.test(biomarker$Lactate)
 ```{r log transform}
 shapiro.test(biomarker$logIL18)
 shapiro.test(biomarker$lognadh)
-shapiro.test(biomarker$logh96)
 shapiro.test(biomarker$logbglob)
 ```
 <p>Log transforming IL-18 and nadh made those two normally distributed, while HMITO_96 and bglob remain non-normal
@@ -114,7 +103,7 @@ shapiro.test(biomarker$logbglob)
 ## Regressions
 ###Univariate
 ```{r univariate regression}
-biomarker %>% dplyr::select(logIL18, lognadh, HMITO_38, logh96, logbglob, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>%
+biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>%
   group_by(marker) %>% do(tidy(lm(value~score, data = .))) %>% filter(term != "(Intercept)")
 
 ```
@@ -124,7 +113,7 @@ biomarker %>% dplyr::select(logIL18, lognadh, HMITO_38, logh96, logbglob, Lactat
 
 ###Controlling for APACHE score
 ```{r multivariate regression}
-biomarker %>% dplyr::select(logIL18, lognadh, HMITO_38, logh96, logbglob, Lactate, score, APACHE) %>% gather(marker, value, -score, -APACHE, na.rm=T) %>%
+biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, score, APACHE) %>% gather(marker, value, -score, -APACHE, na.rm=T) %>%
   group_by(marker) %>% do(tidy(lm(value~score+APACHE, data = .))) %>% filter(term != "(Intercept)")
 ```
 <p>APACHE is a significant predictor of all the biomarkers (lactate is borderline) in the model. Controlling for APACHE, CXR score is no longer predictive of bglob (log transformed, represents nucDNA) or nadh (log transformed, represents mtDNA).
@@ -135,5 +124,46 @@ biomarker %>% dplyr::select(logIL18, lognadh, HMITO_38, logh96, logbglob, Lactat
 biomarker %>% mutate(quartile = as.factor(quartile)) %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, quartile) %>% gather(marker, value, -quartile, na.rm=T) %>%
   group_by(marker) %>% do(tidy(lm(value~quartile, data = .))) %>% filter(term != "(Intercept)")
 ```
+
+##Survival
+
+```{r cox on nadh}
+#Cox regression on biomarker data
+cox_mtDNA <- coxph(Surv(survival, censor) ~ lognadh+APACHE, data=biomarker)
+summary(cox_mtDNA)
+```
+
+```{r cox on nadh w CXR}
+#CXR remains predictive of mortality even when adjusted for APACHE AND mtDNA
+cox_mtDNA_CXR <- coxph(Surv(survival, censor) ~ lognadh+APACHE+Total, data=biomarker)
+summary(cox_mtDNA_CXR)
+```
+
+##NADH Threshold
+<p> the mtDNA paper noted a threshold effect at 3,200 copies, however than puts only 13 subjects in the "low" group. So let's split the mtDNA into quartiles and see what it looks like.
+
+```{r}
+biomarker <- biomarker %>% mutate(nadh_quart = as.factor(ntile(nadh_copies,4)))
+```
+```{r}
+biomarker %>% group_by(nadh_quart) %>% summarize(max = max(nadh_copies), min = min(nadh_copies))
+```
+
+```{r}
+cox_nadh <- coxph(Surv(survival, censor) ~ strata(nadh_quart), data=biomarker)
+
+plot_KM_mtDNA <- ggsurvplot(survfit(cox_nadh), data=biomarker, 
+           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2", "Q3", "Q4"),
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
+           xlab="Months", font.legend=8, title="Survival by quartiles of mtDNA", font.title=10,
+           legend=c(1.1,0.6), risk.table.y.text=FALSE,
+           risk.table.fontsize=3, risk.table.title="") 
+plot_KM_mtDNA$plot <- plot_KM_mtDNA$plot + theme(plot.title = element_text(hjust = 0.5))
+plot_KM_mtDNA
+```
+
+<p> It would seem the lowest quartile does notable worse, survival wise. This suggests a threshold around 1237 copies.
+
 
 

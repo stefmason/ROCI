@@ -21,26 +21,20 @@ library(gridExtra)
 knitr::opts_chunk$set(message = FALSE)
 ```
 ```{r load data, echo=FALSE}
-#Load outcomes data
-outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", col_types = c("numeric", "skip", "numeric", "numeric", "numeric", "numeric", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "date", "date", "numeric", "numeric", "date", "date",  "numeric", "date", "date", "numeric", "text", "numeric", "text", "numeric", "numeric", "date", "numeric", "numeric", "text", "numeric", "text", "text"))
-#Load imaging/score data
-images <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", col_types = c("numeric", "text", "date", "numeric", "date", "numeric", "numeric", "numeric", "date", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "skip"))
+#Load data
+outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:27))
+imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", range = cell_cols(1:11))
 
-#Creates one dataset of outcomes and scores for subjects with a CXR from MICU admit
-admit <- filter(images, Final_Dx != "Control", admit_cxr == 1) %>% dplyr::select(Subject_ID, cxr_date, Quad1, Quad2, Quad3, Quad4, Total)
-imgs <- filter(outcomes, Final_Dx != "Control", imgs == 1) %>% dplyr::select (Subject_ID, Male, Age, BMI, non_white, Immsupp, APACHE, SOFA, days_MV, ICU_admit, ICU_days, Hosp_admit, Hosp_days, Final_Dx, DC_coded, hosp_death, date_death, mort28d, mort60d) %>% merge(admit, by="Subject_ID")
+#RWarngle data
+outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male))
 
-# 207/559 subjects are immunosuppressed
-# 286/559 subjects have a BMI recorded
-# 285/559 subjects were intubated
+imgs <- imgs %>% dplyr::select(-day_3_cxr, -day_5_cxr) %>% filter(admit_cxr == 1) %>% left_join(outcomes, by = "Subject_ID") %>% filter(Final_Dx != "Control") 
 
 #Numerics to factor
-imgs$Male <- as.factor(imgs$Male)
-imgs$non_white <- as.factor(imgs$non_white)
-imgs$Immsupp <- as.factor(imgs$Immsupp)
-imgs$hosp_death <- as.factor(imgs$hosp_death)
 imgs$mort28d <- as.factor(imgs$mort28d)
 imgs$mort60d <- as.factor(imgs$mort60d)
+
+rm(outcomes)
 ```
 
 #In-hospital Mortality
