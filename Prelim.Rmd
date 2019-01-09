@@ -50,6 +50,16 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
+```{r in-hosp non-ARDS}
+hosp_mort_non <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_non)
+summary(hosp_mort_non)
+
+cbind(OR = exp(coef(hosp_mort_non)),
+      exp(confint(hosp_mort_non)),
+      p = coef(summary(hosp_mort_non))[,4])
+```
+
+
 #28-day and 60-day mortality
 ##Logistic Regression
 
@@ -69,6 +79,8 @@ summary(two_month)
 cbind(OR = exp(coef(two_month)),
       exp(confint(two_month)),
       p = coef(summary(two_month))[,4])
+
+imgs %>% filter(mort60d == 1) %>% summarize(count = length(Total))
 ```
 
 #Overall Mortality
@@ -284,6 +296,9 @@ imgs %>% summarize(mean = mean(survival), median = median(survival), min = min(s
 imgs %>% mutate(surv_quart = ntile(survival, 4)) %>% group_by(surv_quart) %>% summarize(mean = mean(survival), median = median(survival), min = min(survival), max = max(survival), count = length(survival))
 ```
 
+```{r case mix}
+imgs %>% group_by(Final_Dx) %>% summarize(count = length(Total))
+```
 
 
 
