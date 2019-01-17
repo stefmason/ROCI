@@ -51,6 +51,8 @@ cbind(OR = exp(coef(hosp_mort)),
 ```
 
 ```{r in-hosp non-ARDS}
+imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
+
 hosp_mort_non <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_non)
 summary(hosp_mort_non)
 
@@ -103,9 +105,12 @@ imgs <- imgs %>% mutate(quartile = ntile(Total,4))
 imgs$quartile <- as.factor(imgs$quartile)
 
 #Cox regressions
-cox_qt <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+strata(quartile), data=imgs) #for graph
-cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+upthree, data=imgs) #for betas
+cox_qt <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs) #for graph
+cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs) #for betas
 summary(cox_quart)
+
+schoenfeld_res <- cox.zph(cox_quart)
+plot(schoenfeld_res)
 ```
 
 ```{r pairwise quartile for Cox}
@@ -144,7 +149,8 @@ plot_all
 ```{r Cox regression for non ARDS}
 #non-ARDS patients
 imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
-cox_all_non <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs_non)
+
+cox_all_non <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs_non)
 summary(cox_all_non)
 ```
 ```{r pairwise quartile non ARDS}
@@ -198,17 +204,17 @@ cbind(OR = exp(coef(hosp_mort)),
 
 ```{r pairwise in-hosp quartile evaluation}
 contrasts(imgs$quartile) <- contr.treatment(4, base=2)
-inhosp_quart_base2 <- glm(hosp_mort ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+inhosp_quart_base2 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base2)
 #result: Q1is significant, 3 and 4 are not
 
 contrasts(imgs$quartile) <- contr.treatment(4, base=3)
-inhosp_quart_base3 <- glm(hosp_mort ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+inhosp_quart_base3 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base3)
 #result: Q1 is significant, 2 and 4 are not
 
 contrasts(imgs$quartile) <- contr.treatment(4, base=4)
-inhosp_quart_base4 <- glm(hosp_mort ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+inhosp_quart_base4 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base4)
 #result: Q1 is significant, 2 and 3 are not
 
@@ -225,11 +231,6 @@ ICUdays_nb <- glm.nb(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=im
 summary(ICUdays_nb)
 cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
 
-#Translate into days (mean x IRR)
-incr_days = 1.057175 * mean(imgs$ICU_days)
-incr_days
-mean(imgs$ICU_days)
-
 #ICUdays_nbq <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
 #summary(ICUdays_nbq)
 #cbind(IRR = exp(coef(ICUdays_nbq)), exp(confint(ICUdays_nbq)))[2:4,]
@@ -238,10 +239,10 @@ mean(imgs$ICU_days)
 ##Duration of mechanical ventilation
 ```{r mechanical ventilation, warning=FALSE}
 
-#Negative binomial model
-MVdays_nb <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(MVdays_nb)
-cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
+#Negative binomial model - all patients
+#MVdays_nb <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+#summary(MVdays_nb)
+#cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
 
 #only intubated patients
 intub <- imgs %>% filter(days_MV != 0)
@@ -253,6 +254,19 @@ cbind(IRR = exp(coef(MVdays_nb2)), exp(confint(MVdays_nb2)))[2,]
 #summary(MVdays_nbq)
 #cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
 ```
+
+```{r IRR to absolute days}
+#ICU days (mean x IRR)
+incr_days = exp(coef(ICUdays_nb)) * mean(imgs$ICU_days)
+incr_days
+mean(imgs$ICU_days)
+
+#Days MV
+more_days = exp(coef(MVdays_nb2)) * mean(intub$days_MV)
+more_days
+mean(intub$days_MV)
+```
+
 
 ```{r boxplot}
 library(reshape2)
@@ -298,6 +312,10 @@ imgs %>% mutate(surv_quart = ntile(survival, 4)) %>% group_by(surv_quart) %>% su
 
 ```{r case mix}
 imgs %>% group_by(Final_Dx) %>% summarize(count = length(Total))
+```
+
+```{r histogram of CXR scores}
+imgs %>% ggplot(aes(Total, color = quartile, fill = quartile)) + geom_histogram(bins = 15)
 ```
 
 
