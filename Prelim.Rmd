@@ -96,6 +96,9 @@ imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(dif
 #Cox regression model
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
 summary(cox_all)
+
+schoenfeld_res <- cox.zph(cox_all)
+plot(schoenfeld_res)
 ```
 
 ##Cox regression of entire cohort by quartile
@@ -103,14 +106,14 @@ summary(cox_all)
 #create quartiles
 imgs <- imgs %>% mutate(quartile = ntile(Total,4)) 
 imgs$quartile <- as.factor(imgs$quartile)
-
+```
+```{r cox all subjects by quartiles}
 #Cox regressions
-cox_qt <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs) #for graph
-cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs) #for betas
-summary(cox_quart)
+cox_qt <- survfit(Surv(survival, censor) ~ quartile, data=imgs) #for graph
+cox_qt
 
-schoenfeld_res <- cox.zph(cox_quart)
-plot(schoenfeld_res)
+#cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs) #for betas
+#summary(cox_quart)
 ```
 
 ```{r pairwise quartile for Cox}
@@ -134,24 +137,27 @@ contrasts(imgs$quartile) <- contr.treatment(4, base=1)
 ```
 
 ```{r Kaplan Meier all subjects}
-plot_all <- ggsurvplot(survfit(cox_qt), data=imgs, 
+plot_all <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
            ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
-           xlab="Months", font.legend=8, title="entire cohort", font.title=10,
+           xlab="Months", font.legend=8, title="Entire cohort", font.title=10,
            legend=c(1.1,0.6), risk.table.y.text=FALSE,
            risk.table.fontsize=3, risk.table.title="") 
 plot_all$plot <- plot_all$plot + theme(plot.title = element_text(hjust = 0.5))
 plot_all
 ```
 
+
 ##Cox regression for non-ARDS subset
 ```{r Cox regression for non ARDS}
 #non-ARDS patients
 imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
 
-cox_all_non <- coxph(Surv(survival, censor) ~ strata(quartile), data=imgs_non)
+cox_all_non <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs_non) #for betas
 summary(cox_all_non)
+
+cox_all_non_strata <- survfit(Surv(survival, censor) ~ quartile, data = imgs_non) #for KM
 ```
 ```{r pairwise quartile non ARDS}
 contrasts(imgs_non$quartile) <- contr.treatment(4, base=4)
@@ -174,11 +180,11 @@ contrasts(imgs_non$quartile) <- contr.treatment(4, base=1)
 ```
 
 ```{r KM for non ARDS}
-plot_non <- ggsurvplot(survfit(cox_all_non), data=imgs_non, 
+plot_non <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3,
            ggtheme = theme_minimal(), legend.title="Quartile", 
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
-           xlab="Months", font.legend=8, title="non-ARDS patients", font.title=10,
+           xlab="Months", font.legend=8, title="Non-ARDS patients", font.title=10,
            legend="none", risk.table.y.text=FALSE, 
            risk.table.fontsize=3, risk.table.title="") 
 plot_non$plot <- plot_non$plot + theme(axis.text.y = element_blank(), plot.title = element_text(hjust = 0.5))
@@ -301,7 +307,7 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, value, color=variable, fill=quarti
 #summary(zinb)
 ```
 
-
+##Miscellaneous
 ```{r survival stats}
 shapiro.test(imgs$survival)
 
