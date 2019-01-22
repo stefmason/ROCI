@@ -296,7 +296,7 @@ meltICU <- imgs %>% dplyr::select(Subject_ID, ICU_days, quartile) %>% melt(id.va
 meltMV <- imgs %>% filter(days_MV != 0) %>% dplyr::select(Subject_ID, days_MV, quartile) %>% melt(id.vars="quartile", measure.vars="days_MV")
 meltplot <- rbind(meltICU, meltMV)
 ```
-```{r boxplot: square root}
+```{r boxplot: square root vs log}
 #Generate the boxplot
 ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +   
   scale_x_discrete(name="Chest Radiograph Score Quartile") + 
@@ -304,8 +304,17 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +
   theme_minimal() + theme(plot.title = element_text(face = "bold")) +
   theme(panel.grid.minor = element_blank()) + 
   theme(legend.title = element_blank()) +
-  
+  theme(legend.position = "bottom") +
+  scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
 
+ggplot(meltplot) + geom_boxplot(aes(quartile, log(value), color=variable)) +   
+  scale_x_discrete(name="Chest Radiograph Score Quartile") + 
+  scale_y_continuous(name="(Log of) Days") +
+  theme_minimal() + theme(plot.title = element_text(face = "bold")) +
+  theme(panel.grid.minor = element_blank()) + 
+  theme(legend.title = element_blank()) +
+  theme(legend.position = "bottom") +
+  scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
 ```
 
 
