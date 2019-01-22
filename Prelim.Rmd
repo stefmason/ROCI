@@ -96,7 +96,9 @@ imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(dif
 #Cox regression model
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
 summary(cox_all)
+```
 
+```{r test PH assumption}
 schoenfeld_res <- cox.zph(cox_all)
 plot(schoenfeld_res)
 ```
@@ -208,21 +210,33 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
-```{r pairwise in-hosp quartile evaluation}
+```{r pairwise in-hosp quartile evaluation, message=FALSE}
 contrasts(imgs$quartile) <- contr.treatment(4, base=2)
 inhosp_quart_base2 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base2)
 #result: Q1is significant, 3 and 4 are not
+
+cbind(OR = exp(coef(inhosp_quart_base2)),
+      exp(confint(inhosp_quart_base2)),
+      p = coef(summary(inhosp_quart_base2))[,4])
 
 contrasts(imgs$quartile) <- contr.treatment(4, base=3)
 inhosp_quart_base3 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base3)
 #result: Q1 is significant, 2 and 4 are not
 
+cbind(OR = exp(coef(inhosp_quart_base3)),
+      exp(confint(inhosp_quart_base3)),
+      p = coef(summary(inhosp_quart_base3))[,4])
+
 contrasts(imgs$quartile) <- contr.treatment(4, base=4)
 inhosp_quart_base4 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base4)
 #result: Q1 is significant, 2 and 3 are not
+
+cbind(OR = exp(coef(inhosp_quart_base4)),
+      exp(confint(inhosp_quart_base4)),
+      p = coef(summary(inhosp_quart_base4))[,4])
 
 #reset factor to base 1
 contrasts(imgs$quartile) <- contr.treatment(4, base=1)
@@ -274,22 +288,23 @@ mean(intub$days_MV)
 ```
 
 
-```{r boxplot}
+```{r boxplot data prep}
 library(reshape2)
 library(RColorBrewer)
 #Eliminate non-intubated from the MV data and transform for plotting
 meltICU <- imgs %>% dplyr::select(Subject_ID, ICU_days, quartile) %>% melt(id.vars="quartile", measure.vars="ICU_days")
 meltMV <- imgs %>% filter(days_MV != 0) %>% dplyr::select(Subject_ID, days_MV, quartile) %>% melt(id.vars="quartile", measure.vars="days_MV")
 meltplot <- rbind(meltICU, meltMV)
-
+```
+```{r boxplot: square root}
 #Generate the boxplot
-ggplot(meltplot) + geom_boxplot(aes(quartile, value, color=variable, fill=quartile, line=quartile)) +   
-  scale_x_discrete(name="CXR Score Quartile") + 
-  scale_y_sqrt(name="Days", breaks=c(0,4,9,16,25,36,49,64,81)) +
-  ggtitle("Duration of Mechanical Ventilation & ICU Length of Stay") +
+ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +   
+  scale_x_discrete(name="Chest Radiograph Score Quartile") + 
+  scale_y_continuous(name="(Square root of) Days") +
   theme_minimal() + theme(plot.title = element_text(face = "bold")) +
   theme(panel.grid.minor = element_blank()) + 
-  guides(color=guide_legend(title = "Outcome"))
+  theme(legend.title = element_blank()) +
+  
 
 ```
 
