@@ -18,8 +18,10 @@ library(survival)
 library(survminer)
 library(QuantPsyc)
 library(gridExtra)
+library(clinfun)
 knitr::opts_chunk$set(message = FALSE)
 ```
+
 ```{r load data, echo=FALSE}
 #Load data
 outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:27))
@@ -36,6 +38,58 @@ imgs$mort60d <- as.factor(imgs$mort60d)
 
 rm(outcomes)
 ```
+
+```{r fun w functions, echo=FALSE}
+#Function to compare means 
+
+my_stat_compare_means  <- function (mapping = NULL, data = NULL, method = NULL, paired = FALSE,
+                                    method.args = list(), ref.group = NULL, comparisons = NULL,
+                                    hide.ns = FALSE, label.sep = ", ", label = NULL, label.x.npc = "left",
+                                    label.y.npc = "top", label.x = NULL, label.y = NULL, tip.length = 0.03,
+                                    symnum.args = list(), geom = "text", position = "identity",
+                                    na.rm = FALSE, show.legend = NA, inherit.aes = TRUE, ...)
+{
+  if (!is.null(comparisons)) {
+    method.info <- ggpubr:::.method_info(method)
+    method <- method.info$method
+    method.args <- ggpubr:::.add_item(method.args, paired = paired)
+    if (method == "wilcox.test")
+      method.args$exact <- FALSE
+    pms <- list(...)
+    size <- ifelse(is.null(pms$size), 0.3, pms$size)
+    color <- ifelse(is.null(pms$color), "black", pms$color)
+    map_signif_level <- FALSE
+    if (is.null(label))
+      label <- "p.format"
+    if (ggpubr:::.is_p.signif_in_mapping(mapping) | (label %in% "p.signif")) {
+      if (ggpubr:::.is_empty(symnum.args)) {
+        map_signif_level <- c(`****` = 1e-04, `***` = 0.001,
+                              `**` = 0.01, `*` = 0.05, ns = 1)
+      } else {
+        map_signif_level <- symnum.args
+      }
+      if (hide.ns)
+        names(map_signif_level)[5] <- " "
+    }
+    step_increase <- ifelse(is.null(label.y), 0.12, 0)
+    ggsignif::geom_signif(comparisons = comparisons, y_position = label.y,
+                          test = method, test.args = method.args, step_increase = step_increase,
+                          size = size, color = color, map_signif_level = map_signif_level,
+                          tip_length = tip.length, data = data)
+  } else {
+    mapping <- ggpubr:::.update_mapping(mapping, label)
+    layer(stat = StatCompareMeans, data = data, mapping = mapping,
+          geom = geom, position = position, show.legend = show.legend,
+          inherit.aes = inherit.aes, params = list(label.x.npc = label.x.npc,
+                                                   label.y.npc = label.y.npc, label.x = label.x,
+                                                   label.y = label.y, label.sep = label.sep, method = method,
+                                                   method.args = method.args, paired = paired, ref.group = ref.group,
+                                                   symnum.args = symnum.args, hide.ns = hide.ns,
+                                                   na.rm = na.rm, ...))
+  }
+}
+```
+
 
 #In-hospital Mortality
 ##Logistic Regression
@@ -256,6 +310,48 @@ cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
 #cbind(IRR = exp(coef(ICUdays_nbq)), exp(confint(ICUdays_nbq)))[2:4,]
 ```
 
+```{r ICU LOS pairwise quartile}
+#Base = 1
+contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
+ICUdays_nb_q1 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(ICUdays_nb_q1)
+
+cbind(IRR = exp(coef(ICUdays_nb_q1)),
+      exp(confint(ICUdays_nb_q1)),
+      p = coef(summary(ICUdays_nb_q1))[,4])
+
+#Base = 2
+contrasts(imgs$quartile) <-contr.treatment(4,base = 2)
+ICUdays_nb_q2 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(ICUdays_nb_q2)
+
+cbind(IRR = exp(coef(ICUdays_nb_q2)),
+      exp(confint(ICUdays_nb_q2)),
+      p = coef(summary(ICUdays_nb_q2))[,4])
+
+#Base = 3
+contrasts(imgs$quartile) <-contr.treatment(4,base = 3)
+ICUdays_nb_q3 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(ICUdays_nb_q3)
+
+cbind(IRR = exp(coef(ICUdays_nb_q3)),
+      exp(confint(ICUdays_nb_q3)),
+      p = coef(summary(ICUdays_nb_q3))[,4])
+
+#Base = 4
+contrasts(imgs$quartile) <-contr.treatment(4,base = 4)
+ICUdays_nb_q4 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(ICUdays_nb_q4)
+
+cbind(IRR = exp(coef(ICUdays_nb_q4)),
+      exp(confint(ICUdays_nb_q4)),
+      p = coef(summary(ICUdays_nb_q4))[,4])
+
+#Reset base level
+contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
+```
+
+
 ##Duration of mechanical ventilation
 ```{r mechanical ventilation, warning=FALSE}
 
@@ -274,6 +370,48 @@ cbind(IRR = exp(coef(MVdays_nb2)), exp(confint(MVdays_nb2)))[2,]
 #summary(MVdays_nbq)
 #cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
 ```
+
+```{r duration MV pairwaise quartile}
+#Base = 1
+contrasts(intub$quartile) <-contr.treatment(4,base = 1)
+MVdays_nb2_q1 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+summary(MVdays_nb2_q1)
+
+cbind(IRR = exp(coef(MVdays_nb2_q1)),
+      exp(confint(MVdays_nb2_q1)),
+      p = coef(summary(MVdays_nb2_q1))[,4])
+
+#Base = 2
+contrasts(intub$quartile) <-contr.treatment(4,base = 2)
+MVdays_nb2_q2 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+summary(MVdays_nb2_q2)
+
+cbind(IRR = exp(coef(MVdays_nb2_q2)),
+      exp(confint(MVdays_nb2_q2)),
+      p = coef(summary(MVdays_nb2_q2))[,4])
+
+#Base = 3
+contrasts(intub$quartile) <-contr.treatment(4,base = 3)
+MVdays_nb2_q3 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+summary(MVdays_nb2_q3)
+
+cbind(IRR = exp(coef(MVdays_nb2_q3)),
+      exp(confint(MVdays_nb2_q3)),
+      p = coef(summary(MVdays_nb2_q3))[,4])
+
+#Base = 4
+contrasts(intub$quartile) <-contr.treatment(4,base = 4)
+MVdays_nb2_q4 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+summary(MVdays_nb2_q4)
+
+cbind(IRR = exp(coef(MVdays_nb2_q4)),
+      exp(confint(MVdays_nb2_q4)),
+      p = coef(summary(MVdays_nb2_q4))[,4])
+
+#Reset base level
+contrasts(intub$quartile) <-contr.treatment(4,base = 1)
+```
+
 
 ```{r IRR to absolute days}
 #ICU days (mean x IRR)
@@ -296,8 +434,8 @@ meltICU <- imgs %>% dplyr::select(Subject_ID, ICU_days, quartile) %>% melt(id.va
 meltMV <- imgs %>% filter(days_MV != 0) %>% dplyr::select(Subject_ID, days_MV, quartile) %>% melt(id.vars="quartile", measure.vars="days_MV")
 meltplot <- rbind(meltICU, meltMV)
 ```
-```{r boxplot: square root vs log}
-#Generate the boxplot
+```{r boxplot: options}
+#Boxplot square root scale
 ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +   
   scale_x_discrete(name="Chest Radiograph Score Quartile") + 
   scale_y_continuous(name="(Square root of) Days") +
@@ -307,14 +445,43 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +
   theme(legend.position = "bottom") +
   scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
 
+#Boxplot log scale
 ggplot(meltplot) + geom_boxplot(aes(quartile, log(value), color=variable)) +   
   scale_x_discrete(name="Chest Radiograph Score Quartile") + 
-  scale_y_continuous(name="(Log of) Days") +
+  scale_y_continuous(name="(Log of) Days", limits=c(0,5)) +
   theme_minimal() + theme(plot.title = element_text(face = "bold")) +
   theme(panel.grid.minor = element_blank()) + 
   theme(legend.title = element_blank()) +
   theme(legend.position = "bottom") +
   scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
+
+```
+
+```{r boxplot with stats}
+box_comparisons <- list(c("1","2"), c("2","3"), c("3","4"), c("1","3"), c("1","4"),  c("2","4"))
+
+symnum.args <- c("***"=0.0083333,ns=1)
+
+var_names <- c('ICU_days' = "Length of ICU stay", 'days_MV' = "Ventilator days")
+
+my_boxplot <- ggplot(meltplot, aes(quartile, log(value))) + geom_boxplot() + 
+  facet_grid(.~ variable, labeller=as_labeller(var_names)) +
+  my_stat_compare_means(label = "p.signif", method = "wilcox.test", comparisons = box_comparisons, symnum.args = symnum.args) +
+  scale_x_discrete(name="Chest Radiograph Score Quartile") +
+  scale_y_continuous(name="(Log) Days", limits=c(-0.25,7.5)) +
+  theme_bw() +
+  annotate("text", x=2.5, y=-0.2, label="p for trend < .001")
+
+my_boxplot 
+```
+
+```{r trend test}
+# jonkheere Terpstra test
+meltICU$quartile <- ordered(meltICU$quartile, levels=c("1", "2", "3", "4"))
+jonckheere.test(meltICU$value, meltICU$quartile, alternative="two.sided")
+
+meltMV$quartile <- ordered(meltMV$quartile, levels=c("1", "2", "3", "4"))
+jonckheere.test(meltMV$value, meltMV$quartile, alternative="two.sided")
 ```
 
 
