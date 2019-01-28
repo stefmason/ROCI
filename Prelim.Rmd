@@ -212,7 +212,7 @@ plot_all
 #non-ARDS patients
 imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
 
-cox_all_non <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs_non) #for betas
+cox_all_non <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+Total, data=imgs_non) #for betas
 summary(cox_all_non)
 
 cox_all_non_strata <- survfit(Surv(survival, censor) ~ quartile, data = imgs_non) #for KM
@@ -297,6 +297,46 @@ cbind(OR = exp(coef(inhosp_quart_base4)),
 #reset factor to base 1
 contrasts(imgs$quartile) <- contr.treatment(4, base=1)
 ```
+
+```{r non-ARDS in hospital mortality}
+hosp_mort_non_r1 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_non)
+summary(hosp_mort_non_r1)
+
+cbind(OR = exp(coef(hosp_mort_non_r1)),
+      exp(confint(hosp_mort_non_r1)),
+      p = coef(summary(hosp_mort_non_r1))[,4])
+
+#ref level =2
+contrasts(imgs_non$quartile) <- contr.treatment(4, base = 2)
+hosp_mort_non_r2 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_non)
+summary(hosp_mort_non_r2)
+
+cbind(OR = exp(coef(hosp_mort_non_r2)),
+      exp(confint(hosp_mort_non_r2)),
+      p = coef(summary(hosp_mort_non_r2))[,4])
+
+#ref level = 3
+contrasts(imgs_non$quartile) <- contr.treatment(4, base = 3)
+hosp_mort_non_r3 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_non)
+summary(hosp_mort_non_r3)
+
+cbind(OR = exp(coef(hosp_mort_non_r3)),
+      exp(confint(hosp_mort_non_r3)),
+      p = coef(summary(hosp_mort_non_r3))[,4])
+
+#ref level = 4
+contrasts(imgs_non$quartile) <- contr.treatment(4, base = 4)
+hosp_mort_non_r4 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_non)
+summary(hosp_mort_non_r4)
+
+cbind(OR = exp(coef(hosp_mort_non_r4)),
+      exp(confint(hosp_mort_non_r4)),
+      p = coef(summary(hosp_mort_non_r4))[,4])
+
+#reset ref level to 1
+contrasts(imgs_non$quartile) <- contr.treatment(4, base = 1)
+```
+
 
 ##ICU Length of stay
 ```{r ICU LOS, warning=FALSE}
@@ -417,14 +457,15 @@ contrasts(intub$quartile) <-contr.treatment(4,base = 1)
 
 ```{r IRR to absolute days}
 #ICU days (mean x IRR)
-incr_days = exp(coef(ICUdays_nb)) * mean(imgs$ICU_days)
+incr_days = (1.056845 * mean(imgs$ICU_days)) - mean(imgs$ICU_days)
 incr_days
-mean(imgs$ICU_days)
+median(imgs$ICU_days)
 
 #Days MV
-more_days = exp(coef(MVdays_nb2)) * mean(intub$days_MV)
+more_days = (1.044315 * mean(intub$days_MV)) - mean(intub$days_MV)
 more_days
-mean(intub$days_MV)
+median(intub$days_MV)
+
 ```
 
 
@@ -500,7 +541,9 @@ jonckheere.test(meltMV$value, meltMV$quartile, alternative="two.sided")
 #summary(zinb)
 ```
 
+
 ##Miscellaneous
+
 ```{r survival stats}
 shapiro.test(imgs$survival)
 
@@ -515,6 +558,10 @@ imgs %>% group_by(Final_Dx) %>% summarize(count = length(Total))
 
 ```{r histogram of CXR scores}
 imgs %>% ggplot(aes(Total, color = quartile, fill = quartile)) + geom_histogram(bins = 15)
+
+imgs %>% summarize( median = median(Total), mean = mean(Total))
+
+imgs %>% group_by(quartile) %>% summarize(min = min(Total), max = max(Total))
 ```
 
 

@@ -43,7 +43,65 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 
 #with sam's data
+hosp_mort_sam <- glm(hosp_death ~ score+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_sam)
+summary(hosp_mort_sam)
 
+cbind(OR = exp(coef(hosp_mort_sam)),
+      exp(confint(hosp_mort_sam)),
+      p = coef(summary(hosp_mort_sam))[,4])
+```
+```{r how many are different?}
+#69 of 172 scores were different
+imgs_sam %>% filter(Total != score) %>% dplyr::select(Subject_ID, Total, score)
+```
+```{r cox regression, mine vs Sam}
+refdate <- as.Date("2018-09-15")
+#Create variables with survival (in days) and a binary indicating censored status
+imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
+
+#Cox regression model
+cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
+summary(cox_all)
+
+imgs_sam <- mutate(imgs_sam, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
+
+#Cox regression model
+cox_all_sam <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+score, data=imgs_sam)
+summary(cox_all_sam)
+```
+```{r make quartiles}
+#create quartiles
+imgs <- imgs %>% mutate(quartile = ntile(Total,4)) 
+imgs$quartile <- as.factor(imgs$quartile)
+#create quartiles
+imgs_sam <- imgs_sam %>% mutate(quartile = ntile(score,4)) 
+imgs_sam$quartile <- as.factor(imgs_sam$quartile)
+```
+```{r cox by quartile}
+cox_qt_base1 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs)
+summary(cox_qt_base1)
+
+cox_qt_sam1 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs_sam)
+summary(cox_qt_sam1)
+```
+```{r KM on sam's data}
+cox_qt_sam <- survfit(Surv(survival, censor) ~ quartile, data=imgs_sam)
+
+plot_all_sam <- ggsurvplot(cox_qt_sam, data=imgs_sam, pval=TRUE, pval.size=3,
+           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
+           xlab="Months", font.legend=8, title="Entire cohort", font.title=10,
+           legend=c(1.1,0.6), risk.table.y.text=FALSE,
+           risk.table.fontsize=3, risk.table.title="") 
+plot_all_sam$plot <- plot_all_sam$plot + theme(plot.title = element_text(hjust = 0.5))
+plot_all_sam
+```
+```{r Stef Sam IRR}
+sam_irr <- read_excel("~/Documents/ROCIanalysis/ROCI_sam.xlsx", sheet = "Imaging", range = cell_cols(1:16))
+sam_irr <- sam_irr %>% dplyr::select(Subject_ID, Total, total_sa)
+
+irr::icc(sam_irr[c(2,3)], model="t", type="c", unit="s", r0=0, conf.level=0.95)
 ```
 
 

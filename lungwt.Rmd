@@ -19,7 +19,8 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ### Loading Data
 ```{r load data}
 #Load demographic data for gender
-demo <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:4), col_types = c("numeric", "skip", "skip", "numeric"))
+demo <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:4))
+demo <- demo %>% dplyr::select(-imgs, -Age)
 
 #Load imaging/weight data and merge
 weights <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "LungWt", range = cell_cols(1:12)) %>% 
@@ -39,6 +40,12 @@ weights <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Lung
 summ <- weights %>% summarise(mean = mean(weight, na.rm=T), median = median(weight, na.rm=T)) 
 summ
 ```
+
+```{r scatterplot}
+weights %>% ggplot(aes(side_total, weight)) + geom_point() + geom_smooth(method = "lm") + xlab("CXR score") +
+  ylab("Weight (g)") + ggtitle("CXR score as a predictor of lung weight at autopsy")
+```
+
 
 ###Testing for normality
 <p> The data are non-normal.
@@ -68,6 +75,9 @@ summary(wt)
 ols_plot_resid_qq(wt)
 ols_test_correlation(wt)
 ```
+
+
+
 
 
 
