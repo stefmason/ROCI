@@ -190,6 +190,8 @@ summary(cox_qt_base2)
 
 #reset factor to base 1
 contrasts(imgs$quartile) <- contr.treatment(4, base=1)
+cox_qt_base1 <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs)
+summary(cox_qt_base1)
 ```
 
 ```{r Kaplan Meier all subjects}
