@@ -103,18 +103,36 @@ shapiro.test(biomarker$logbglob)
 ## Regressions
 ###Univariate
 ```{r univariate regression}
-biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>%
-  group_by(marker) %>% do(tidy(lm(value~score, data = .))) %>% filter(term != "(Intercept)")
+biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, Total) %>% gather(marker, value, -Total, na.rm=T) %>%
+  group_by(marker) %>% do(tidy(lm(value~Total, data = .))) %>% filter(term != "(Intercept)")
 
 ```
 <p>The regression demonstrates that CXR score was a significant predictor of HMITO_38, log of nadh, log of HMITO96, log of bglob. It does not appear to be a significant predictor of lactate or IL18 (either untransformed or log transformed).
 
 <p>Since nadh represents mtDNA and bglob represents nucDNA, I can state that CXR severity associates with those. 
 
+```{r spearman correlation}
+biomarker %>% dplyr::select(Total, lognadh) %>% cor(., use = "pairwise.complete.obs", method="spearman")
+biomarker %>% dplyr::select(Total, logbglob) %>% cor(., use = "pairwise.complete.obs", method="spearman")
+biomarker %>% dplyr::select(Total, logIL18) %>% cor(., use = "pairwise.complete.obs", method="spearman")
+```
+
+```{r pearson correlation}
+biomarker %>% dplyr::select(Total, lognadh) %>% cor(., use = "pairwise.complete.obs", method="pearson")
+biomarker %>% dplyr::select(Total, logbglob) %>% cor(., use = "pairwise.complete.obs", method="pearson")
+biomarker %>% dplyr::select(Total, logIL18) %>% cor(., use = "pairwise.complete.obs", method="pearson")
+```
+
+```{r}
+biomarker %>% dplyr::select(Total, lognadh) %>% cor.test(., alternative = "two.sided", method = "pearson")
+```
+
+
+
 ###Controlling for APACHE score
 ```{r multivariate regression}
-biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, score, APACHE) %>% gather(marker, value, -score, -APACHE, na.rm=T) %>%
-  group_by(marker) %>% do(tidy(lm(value~score+APACHE, data = .))) %>% filter(term != "(Intercept)")
+biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, Total, APACHE) %>% gather(marker, value, -Total, -APACHE, na.rm=T) %>%
+  group_by(marker) %>% do(tidy(lm(value~Total+APACHE, data = .))) %>% filter(term != "(Intercept)")
 ```
 <p>APACHE is a significant predictor of all the biomarkers (lactate is borderline) in the model. Controlling for APACHE, CXR score is no longer predictive of bglob (log transformed, represents nucDNA) or nadh (log transformed, represents mtDNA).
 

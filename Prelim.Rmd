@@ -564,5 +564,15 @@ imgs %>% summarize( median = median(Total), mean = mean(Total))
 imgs %>% group_by(quartile) %>% summarize(min = min(Total), max = max(Total))
 ```
 
+```{r recheck tbl 1}
+imgs %>% summarize(med_age = median(Age), med_apa = median(APACHE))
+imgs %>% group_by(Male) %>% summarize(count = length(Total))
+imgs %>% group_by(non_white) %>% summarize(count = length(Total))
+imgs %>% group_by(Immsupp) %>% summarize(count = length(Total))
+
+imgs %>% mutate(age_qt = ntile(Age,4)) %>% group_by(age_qt) %>% summarize(lower = min(Age), upper = max(Age))
+imgs %>% mutate(apa_qt = ntile(APACHE,4)) %>% group_by(apa_qt) %>% summarize(lower = min(APACHE), upper = max(APACHE))
+```
+
 
 
