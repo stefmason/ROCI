@@ -26,18 +26,23 @@ knitr::opts_chunk$set(message = FALSE)
 #Load data
 outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:27))
 imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", range = cell_cols(1:11))
-
+med_hist <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "baseline_data", range = cell_cols(1:32))
+```
+```{r more prep}
 #RWarngle data
-outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male))
+med_hist <- med_hist %>% dplyr::select(subj_id, heart_disease___2, copd) %>% rename(Subject_ID = subj_id) %>% mutate(chf = as.factor(heart_disease___2), copd = as.factor(copd)) %>% dplyr::select(-heart_disease___2)
+
+outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male)) %>% left_join(med_hist, by = "Subject_ID")
 
 imgs <- imgs %>% dplyr::select(-day_3_cxr, -day_5_cxr) %>% filter(admit_cxr == 1) %>% left_join(outcomes, by = "Subject_ID") %>% filter(Final_Dx != "Control") 
 
 #Numerics to factor
 imgs$mort28d <- as.factor(imgs$mort28d)
 imgs$mort60d <- as.factor(imgs$mort60d)
-
 rm(outcomes)
+rm(med_hist)
 ```
+
 
 ```{r fun w functions, echo=FALSE}
 #Function to compare means 
@@ -104,6 +109,16 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
+```{r controlling for copd/chf}
+#In-hospital mortality, entire cohort
+hosp_mort_phx <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort_phx)),
+      exp(confint(hosp_mort_phx)),
+      p = coef(summary(hosp_mort_phx))[,4])
+```
+
 ```{r in-hosp non-ARDS}
 imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
 
@@ -113,6 +128,17 @@ summary(hosp_mort_non)
 cbind(OR = exp(coef(hosp_mort_non)),
       exp(confint(hosp_mort_non)),
       p = coef(summary(hosp_mort_non))[,4])
+```
+
+```{r in hosp ARDS only}
+imgs_ards <- imgs %>% filter(Final_Dx == "ARDS" | Final_Dx == "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
+
+hosp_mort_ards <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs_ards)
+summary(hosp_mort_ards)
+
+cbind(OR = exp(coef(hosp_mort_ards)),
+      exp(confint(hosp_mort_ards)),
+      p = coef(summary(hosp_mort_ards))[,4])
 ```
 
 
@@ -151,6 +177,16 @@ imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(dif
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
 summary(cox_all)
 ```
+```{r controlling for copd/chf}
+cox_all_phx <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total+copd+chf, data=imgs)
+summary(cox_all_phx)
+```
+
+```{r overall mortality in ARDS only}
+cox_ards <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs_ards)
+summary(cox_ards)
+```
+
 
 ```{r test PH assumption}
 schoenfeld_res <- cox.zph(cox_all)
@@ -171,6 +207,24 @@ cox_qt
 #cox_quart <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+quartile, data=imgs) #for betas
 #summary(cox_quart)
 ```
+
+```{r Cox quartiles for ARDS only}
+cox_ards_q <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+quartile, data=imgs_ards)
+summary(cox_ards_q)
+
+cox_ards_qp <- survfit(Surv(survival, censor) ~ quartile, data=imgs_ards)
+
+plot_ards <- ggsurvplot(cox_ards_qp, data=imgs_ards, pval=TRUE, pval.size=3,
+           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
+           xlab="Months", font.legend=8, title="Entire cohort", font.title=10,
+           legend=c(1.1,0.6), risk.table.y.text=FALSE,
+           risk.table.fontsize=3, risk.table.title="") 
+plot_ards$plot <- plot_ards$plot + theme(plot.title = element_text(hjust = 0.5))
+plot_ards
+```
+
 
 ```{r pairwise quartile for Cox}
 contrasts(imgs$quartile) <- contr.treatment(4, base=4)
@@ -211,7 +265,8 @@ plot_all
 ```{r Cox regression for non ARDS}
 #non-ARDS patients
 imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
-
+```
+```{r}
 cox_all_non <- coxph(Surv(survival, censor) ~ Age+Male+Immsupp+non_white+APACHE+Total, data=imgs_non) #for betas
 summary(cox_all_non)
 
@@ -572,6 +627,27 @@ imgs %>% group_by(Immsupp) %>% summarize(count = length(Total))
 
 imgs %>% mutate(age_qt = ntile(Age,4)) %>% group_by(age_qt) %>% summarize(lower = min(Age), upper = max(Age))
 imgs %>% mutate(apa_qt = ntile(APACHE,4)) %>% group_by(apa_qt) %>% summarize(lower = min(APACHE), upper = max(APACHE))
+```
+
+```{r}
+imgs %>% filter(!is.na(date_death)) %>% summarize(count = length(Total)) #total death events in cohort (Cox event rate)
+imgs %>% filter(DC_coded == 0 | DC_coded == 1) %>% summarize(count = length(Total)) #in hospital deaths - entire cohort
+imgs_non %>% filter(DC_coded == 0 | DC_coded == 1) %>% summarize(count = length(Total)) # in hospital deaths for ARDS only
+```
+
+```{r}
+key <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Key", range = cell_cols(1:2))
+```
+```{r}
+subjects <- key %>% filter(Subject_ID %in% imgs$Subject_ID)
+subjects <- imgs %>% dplyr::select(Subject_ID, cxr_date, Hosp_dc) %>% right_join(subjects)
+```
+```{r}
+write.csv(subjects, file="subjects.csv", row.names = FALSE)
+```
+
+```{r}
+
 ```
 
 
