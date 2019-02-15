@@ -414,19 +414,18 @@ contrasts(imgs_non$quartile) <- contr.treatment(4, base = 1)
 contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
 
 #Negative binomial model
-ICUdays_nb <- glm.nb(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+#std errors checked -> okay
+
+ICUdays_nb <- glm.nb(ICU_days ~ Total+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
 summary(ICUdays_nb)
 cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
-
-#ICUdays_nbq <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-#summary(ICUdays_nbq)
-#cbind(IRR = exp(coef(ICUdays_nbq)), exp(confint(ICUdays_nbq)))[2:4,]
 ```
 
 ```{r ICU LOS pairwise quartile}
+#standard errors checked -> okay
 #Base = 1
 contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
-ICUdays_nb_q1 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+ICUdays_nb_q1 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
 summary(ICUdays_nb_q1)
 
 cbind(IRR = exp(coef(ICUdays_nb_q1)),
@@ -435,7 +434,7 @@ cbind(IRR = exp(coef(ICUdays_nb_q1)),
 
 #Base = 2
 contrasts(imgs$quartile) <-contr.treatment(4,base = 2)
-ICUdays_nb_q2 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+ICUdays_nb_q2 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
 summary(ICUdays_nb_q2)
 
 cbind(IRR = exp(coef(ICUdays_nb_q2)),
@@ -444,7 +443,7 @@ cbind(IRR = exp(coef(ICUdays_nb_q2)),
 
 #Base = 3
 contrasts(imgs$quartile) <-contr.treatment(4,base = 3)
-ICUdays_nb_q3 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+ICUdays_nb_q3 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
 summary(ICUdays_nb_q3)
 
 cbind(IRR = exp(coef(ICUdays_nb_q3)),
@@ -453,7 +452,7 @@ cbind(IRR = exp(coef(ICUdays_nb_q3)),
 
 #Base = 4
 contrasts(imgs$quartile) <-contr.treatment(4,base = 4)
-ICUdays_nb_q4 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+ICUdays_nb_q4 <- glm.nb(ICU_days ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
 summary(ICUdays_nb_q4)
 
 cbind(IRR = exp(coef(ICUdays_nb_q4)),
@@ -467,20 +466,24 @@ contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
 
 ##Duration of mechanical ventilation
 ```{r mechanical ventilation, warning=FALSE}
-
-#Negative binomial model - all patients
-#MVdays_nb <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-#summary(MVdays_nb)
-#cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
-
-#only intubated patients
+#make the subset of data: only intubated patients
 intub <- imgs %>% filter(days_MV != 0)
-MVdays_nb2 <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp, data=intub)
+```
+
+```{r neg binomial for days MV}
+#standard errors checked ->okay
+MVdays_nb2 <- glm.nb(days_MV ~ Total+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nb2)
 cbind(IRR = exp(coef(MVdays_nb2)), exp(confint(MVdays_nb2)))[2,]
+```
 
-#MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-#summary(MVdays_nbq)
+```{r quartile}
+#Standard errors checked -> okay
+MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
+summary(MVdays_nbq)
+
+MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
+summary(MVdays_nbq)
 #cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
 ```
 
@@ -528,7 +531,7 @@ contrasts(intub$quartile) <-contr.treatment(4,base = 1)
 
 ```{r IRR to absolute days}
 #ICU days (mean x IRR)
-incr_days = (1.056845 * mean(imgs$ICU_days)) - mean(imgs$ICU_days)
+incr_days = (1.058129 * mean(imgs$ICU_days)) - mean(imgs$ICU_days)
 incr_days
 median(imgs$ICU_days)
 
