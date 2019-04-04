@@ -1,13 +1,7 @@
 ---
 title: "Working ROCI analysis"
 author: "S. Mason"
-output: 
-  html_document:
-    code_folding: hide
-    toc: true
-    toc_float: true
-    toc_depth: 2
-    theme: flatly
+output: pdf_document
 ---
 
 ```{r setup, echo=FALSE, message=FALSE}
@@ -95,6 +89,12 @@ my_stat_compare_means  <- function (mapping = NULL, data = NULL, method = NULL, 
 }
 ```
 
+```{r create surivival data}
+refdate <- as.Date("2018-09-15")
+#Create variables with survival (in days) and a binary indicating censored status
+imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
+```
+
 
 #In-hospital Mortality
 ##Logistic Regression
@@ -109,7 +109,7 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
-```{r controlling for copd/chf}
+```{r in hosp controlling for copd/chf}
 #In-hospital mortality, entire cohort
 hosp_mort_phx <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(hosp_mort)
@@ -170,10 +170,6 @@ imgs %>% filter(mort60d == 1) %>% summarize(count = length(Total))
 ##Cox regression of entire cohort (not in quartiles)
 
 ```{r cox proportional hazards}
-refdate <- as.Date("2018-09-15")
-#Create variables with survival (in days) and a binary indicating censored status
-imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
-
 #Cox regression model
 cox_all <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+Total, data=imgs)
 summary(cox_all)
@@ -466,7 +462,7 @@ contrasts(imgs$quartile) <-contr.treatment(4,base = 1)
 
 ##Duration of mechanical ventilation
 ```{r mechanical ventilation, warning=FALSE}
-#make the subset of data: only intubated patients
+#make the subset of data: only intubated patients (n = 286)
 intub <- imgs %>% filter(days_MV != 0)
 ```
 
@@ -479,10 +475,7 @@ cbind(IRR = exp(coef(MVdays_nb2)), exp(confint(MVdays_nb2)))[2,]
 
 ```{r quartile}
 #Standard errors checked -> okay
-MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=imgs)
-summary(MVdays_nbq)
-
-MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
+MVdays_nbq <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nbq)
 #cbind(IRR = exp(coef(MVdays_nbq)), exp(confint(MVdays_nbq)))[2:4,]
 ```
@@ -490,7 +483,7 @@ summary(MVdays_nbq)
 ```{r duration MV pairwaise quartile}
 #Base = 1
 contrasts(intub$quartile) <-contr.treatment(4,base = 1)
-MVdays_nb2_q1 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+MVdays_nb2_q1 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nb2_q1)
 
 cbind(IRR = exp(coef(MVdays_nb2_q1)),
@@ -499,7 +492,7 @@ cbind(IRR = exp(coef(MVdays_nb2_q1)),
 
 #Base = 2
 contrasts(intub$quartile) <-contr.treatment(4,base = 2)
-MVdays_nb2_q2 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+MVdays_nb2_q2 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nb2_q2)
 
 cbind(IRR = exp(coef(MVdays_nb2_q2)),
@@ -508,7 +501,7 @@ cbind(IRR = exp(coef(MVdays_nb2_q2)),
 
 #Base = 3
 contrasts(intub$quartile) <-contr.treatment(4,base = 3)
-MVdays_nb2_q3 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+MVdays_nb2_q3 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nb2_q3)
 
 cbind(IRR = exp(coef(MVdays_nb2_q3)),
@@ -517,7 +510,7 @@ cbind(IRR = exp(coef(MVdays_nb2_q3)),
 
 #Base = 4
 contrasts(intub$quartile) <-contr.treatment(4,base = 4)
-MVdays_nb2_q4 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp, data=intub)
+MVdays_nb2_q4 <- glm.nb(days_MV ~ quartile+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nb2_q4)
 
 cbind(IRR = exp(coef(MVdays_nb2_q4)),
@@ -536,7 +529,7 @@ incr_days
 median(imgs$ICU_days)
 
 #Days MV
-more_days = (1.044315 * mean(intub$days_MV)) - mean(intub$days_MV)
+more_days = (1.045064 * mean(intub$days_MV)) - mean(intub$days_MV)
 more_days
 median(intub$days_MV)
 
@@ -551,6 +544,14 @@ meltICU <- imgs %>% dplyr::select(Subject_ID, ICU_days, quartile) %>% melt(id.va
 meltMV <- imgs %>% filter(days_MV != 0) %>% dplyr::select(Subject_ID, days_MV, quartile) %>% melt(id.vars="quartile", measure.vars="days_MV")
 meltplot <- rbind(meltICU, meltMV)
 ```
+
+```{r}
+ICUdata <- imgs %>% dplyr::select(Subject_ID, ICU_days, quartile) %>% rename(value = ICU_days) %>% mutate(variable = "ICU_days")
+MVdata <- intub %>% dplyr::select(Subject_ID, days_MV, quartile) %>% rename(value = days_MV) %>% mutate(variable = "days_MV")
+meltplot <- rbind(ICUdata, MVdata)
+```
+
+
 ```{r boxplot: options}
 #Boxplot square root scale
 ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +   
@@ -577,28 +578,56 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, log(value), color=variable)) +
 ```{r boxplot with stats}
 box_comparisons <- list(c("1","2"), c("2","3"), c("3","4"), c("1","3"), c("1","4"),  c("2","4"))
 
-symnum.args <- c("***"=0.0083333,ns=1)
+symnum.args <- c("***"=0.05,ns=1)
 
 var_names <- c('ICU_days' = "Length of ICU stay", 'days_MV' = "Ventilator days")
 
 my_boxplot <- ggplot(meltplot, aes(quartile, log(value))) + geom_boxplot() + 
   facet_grid(.~ variable, labeller=as_labeller(var_names)) +
-  my_stat_compare_means(label = "p.signif", method = "wilcox.test", comparisons = box_comparisons, symnum.args = symnum.args) +
+  my_stat_compare_means(label = "p.signif", method = "t.test", comparisons = box_comparisons, symnum.args = symnum.args) +
   scale_x_discrete(name="Chest Radiograph Score Quartile") +
-  scale_y_continuous(name="(Log) Days", limits=c(-0.25,7.5)) +
+  scale_y_continuous(name="Days", limits=c(-0.25,7.5)) +
   theme_bw() +
   annotate("text", x=2.5, y=-0.2, label="p for trend < .001")
+
+ggsave("boxplots.tiff", unit="cm", width=9, height=6.4, dpi=600, compression='lzw')
 
 my_boxplot 
 ```
 
+```{r boxplot with stats, non-transformed data}
+box_comparisons <- list(c("1","2"), c("2","3"), c("3","4"), c("1","3"), c("1","4"),  c("2","4"))
+
+symnum.args <- c("***"=0.05,ns=1)
+
+var_names <- c('ICU_days' = "Length of ICU stay", 'days_MV' = "Ventilator days")
+
+my_boxplot <- ggplot(meltplot, aes(quartile, value)) + geom_boxplot() + 
+  facet_grid(.~ variable, labeller=as_labeller(var_names)) +
+  my_stat_compare_means(label = "p.signif", method = "t.test", comparisons = box_comparisons, symnum.args = symnum.args) +
+  scale_x_discrete(name="Chest Radiograph Score Quartile") +
+  scale_y_log10(name="Days") +
+  theme_bw() +
+  annotate("text", x=2.5, y=-0.2, label="p for trend < .001")
+
+ggsave("boxplots.tiff", unit="cm", width=9, height=6.4, dpi=600, compression='lzw')
+
+my_boxplot 
+```
+
+```{r}
+wilcox_data <- meltplot %>% filter(variable == "days_MV") %>% filter(quartile == 2 | quartile == 3)
+t.test(log(wilcox_data$value) ~ wilcox_data$quartile)
+```
+
+
 ```{r trend test}
 # jonkheere Terpstra test
-meltICU$quartile <- ordered(meltICU$quartile, levels=c("1", "2", "3", "4"))
-jonckheere.test(meltICU$value, meltICU$quartile, alternative="two.sided")
+ICUdata$quartile <- ordered(ICUdata$quartile, levels=c("1", "2", "3", "4"))
+jonckheere.test(ICUdata$value, ICUdata$quartile, alternative="two.sided")
 
-meltMV$quartile <- ordered(meltMV$quartile, levels=c("1", "2", "3", "4"))
-jonckheere.test(meltMV$value, meltMV$quartile, alternative="two.sided")
+MVdata$quartile <- ordered(MVdata$quartile, levels=c("1", "2", "3", "4"))
+jonckheere.test(MVdata$value, MVdata$quartile, alternative="two.sided")
 ```
 
 
