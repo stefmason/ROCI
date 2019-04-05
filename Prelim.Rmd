@@ -692,4 +692,15 @@ imgs %>% ggplot(aes(quartile, Total, color=hosp_death)) + geom_jitter() + scale_
 imgs %>% ggplot(aes(Total, fill = hosp_death)) + geom_histogram() + scale_fill_manual(values=c("black", "red"))
 ```
 
+Morphology of affected regions
+```{r upper lower left right identification flags}
+imgs <- imgs %>% mutate(lower = ifelse(Quad1+Quad2==0 & Total !=0,1,0), upper = ifelse(Quad3+Quad4==0 & Total !=0,1,0))
+imgs <- imgs %>% mutate(left = ifelse(Quad1+Quad3==0 & Total !=0,1,0), right = ifelse(Quad2+Quad4==0 & Total !=0,1,0))
+```
+```{r one or two quadrant flags}
+imgs <- imgs %>% mutate(one_quad = ifelse((Quad3==0 | Quad4==0) & lower ==1),1,ifelse((Quad1==0 | Quad2==0) & upper==1),1, ifelse((Quad2==0 | Quad4==0) & left==1),1,ifelse((Quad1==0 | Quad3==0) & right==1),1,0)
+imgs <- imgs %>% mutate(two_quad = ifelse((upper==1 | lower==1 | left==1 | right==1) & one_quad ==0),1,0)
+```
+
+
 
