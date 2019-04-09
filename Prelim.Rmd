@@ -698,9 +698,18 @@ imgs <- imgs %>% mutate(lower = ifelse(Quad1+Quad2==0 & Total !=0,1,0), upper = 
 imgs <- imgs %>% mutate(left = ifelse(Quad1+Quad3==0 & Total !=0,1,0), right = ifelse(Quad2+Quad4==0 & Total !=0,1,0))
 ```
 ```{r one or two quadrant flags}
-imgs <- imgs %>% mutate(one_quad = ifelse((Quad3==0 | Quad4==0) & lower ==1),1,ifelse((Quad1==0 | Quad2==0) & upper==1),1, ifelse((Quad2==0 | Quad4==0) & left==1),1,ifelse((Quad1==0 | Quad3==0) & right==1),1,0)
-imgs <- imgs %>% mutate(two_quad = ifelse((upper==1 | lower==1 | left==1 | right==1) & one_quad ==0),1,0)
+imgs <- imgs %>% mutate(one_quad = ifelse( ((Quad3==0 | Quad4==0) & lower ==1) | ((Quad1==0 | Quad2==0) & upper==1) | ((Quad2==0 | Quad4==0) & left==1) | ((Quad1==0 | Quad3==0) & right==1), 1, 0))
+imgs <- imgs %>% mutate(two_quad = ifelse(((upper==1 | lower==1 | left==1 | right==1) & one_quad ==0),1,0))
 ```
 
+```{r in-hospital mortality, num of quad, warning=FALSE}
+#In-hospital mortality
+hosp_mort_numquads <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+one_quad+two_quad, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort_numquads)
+
+cbind(OR = exp(coef(hosp_mort_numquads)),
+      exp(confint(hosp_mort_numquads)),
+      p = coef(summary(hosp_mort_numquads))[,4])
+```
 
 
