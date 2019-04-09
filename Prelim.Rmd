@@ -13,7 +13,14 @@ library(survminer)
 library(QuantPsyc)
 library(gridExtra)
 library(clinfun)
+
 knitr::opts_chunk$set(message = FALSE)
+```
+
+```{R palette}
+# Colorblind friendly palette with black:
+cbbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7", "#F0E442", "#000000")
+library(RColorBrewer)
 ```
 
 ```{r load data, echo=FALSE}
@@ -646,11 +653,20 @@ imgs %>% group_by(Final_Dx) %>% summarize(count = length(Total))
 ```
 
 ```{r distribution of CXR scores}
-imgs %>% ggplot(aes(Total, fill = quartile)) + geom_histogram(bins = 15)
+imgs %>% ggplot(aes(Total, fill = quartile)) + geom_histogram(bins = 16)
 
 imgs %>% summarize( median = median(Total), mean = mean(Total))
 imgs %>% group_by(quartile) %>% summarize(min = min(Total), max = max(Total))
 ```
+```{r distinct quartiles}
+imgs2 <- imgs %>% mutate(quartile = ifelse((Total ==0 | Total==1 | Total==2), 1, ifelse((Total==3 | Total==4 | Total==5 | Total==6),2, ifelse((Total==7 | Total==8 | Total==9 | Total==10),3,4)))) %>% mutate(quartile = as.factor(quartile))
+```
+```{r imgs2 histogram}
+imgs2 %>% ggplot(aes(Total, fill = quartile)) + geom_histogram(bins = 16) +
+  xlab("Total CXR Score") + ggtitle("Distributon of CXR scores") + scale_fill_brewer(palette="Blues") + theme_linedraw()
+imgs2 %>% group_by(quartile) %>% summarize(count = length(Subject_ID))
+```
+
 
 ```{r recheck tbl 1}
 imgs %>% summarize(med_age = median(Age), med_apa = median(APACHE))
@@ -692,24 +708,51 @@ imgs %>% ggplot(aes(quartile, Total, color=hosp_death)) + geom_jitter() + scale_
 imgs %>% ggplot(aes(Total, fill = hosp_death)) + geom_histogram() + scale_fill_manual(values=c("black", "red"))
 ```
 
-Morphology of affected regions
+##Morphology of affected regions
+lower = both upper quadrants are zero
+upper = both lower quadrants are zero
+right = both left quadrants are zero
+left = both right quadrants are zero
 ```{r upper lower left right identification flags}
-imgs <- imgs %>% mutate(lower = ifelse(Quad1+Quad2==0 & Total !=0,1,0), upper = ifelse(Quad3+Quad4==0 & Total !=0,1,0))
-imgs <- imgs %>% mutate(left = ifelse(Quad1+Quad3==0 & Total !=0,1,0), right = ifelse(Quad2+Quad4==0 & Total !=0,1,0))
+imgs <- imgs %>% mutate(lower = ifelse(Quad1+Quad2==0 & Total !=0,1,0), upper = ifelse(Quad3+Quad4==0 & Total !=0,1,0)) %>% mutate(lower = as.factor(lower), upper = as.factor(upper))
+imgs <- imgs %>% mutate(left = ifelse(Quad1+Quad3==0 & Total !=0,1,0), right = ifelse(Quad2+Quad4==0 & Total !=0,1,0)) %>% mutate(left = as.factor(left), right = as.factor(right))
 ```
-```{r one or two quadrant flags}
-imgs <- imgs %>% mutate(one_quad = ifelse( ((Quad3==0 | Quad4==0) & lower ==1) | ((Quad1==0 | Quad2==0) & upper==1) | ((Quad2==0 | Quad4==0) & left==1) | ((Quad1==0 | Quad3==0) & right==1), 1, 0))
-imgs <- imgs %>% mutate(two_quad = ifelse(((upper==1 | lower==1 | left==1 | right==1) & one_quad ==0),1,0))
+
+```{r quadrant flags}
+imgs <- imgs %>% mutate(one_quad = ifelse( ((Quad3==0 | Quad4==0) & lower ==1) | ((Quad1==0 | Quad2==0) & upper==1) | ((Quad2==0 | Quad4==0) & left==1) | ((Quad1==0 | Quad3==0) & right==1), 1, 0)) %>% mutate(one_quad = as.factor(one_quad)) #one quad
+imgs <- imgs %>% mutate(two_quad = ifelse(((upper==1 | lower==1 | left==1 | right==1) & one_quad ==0),1,0)) #two quad neighbors
+imgs <- imgs %>% mutate(two_quad = ifelse(((Quad1+Quad4==0 | Quad2+Quad3==0) & one_quad==0 & Total !=0),1,0)) %>% mutate(two_quad = as.factor(two_quad)) #two quad diagonal
+imgs <- imgs %>% mutate(four_quad = ifelse(Quad1>0 & Quad2>0 & Quad3>0 & Quad4>0,1,0), three_quad = ifelse((Total !=0 & one_quad==0 & two_quad==0 & four_quad==0),1,0)) %>% mutate(three_quad = as.factor(three_quad), four_quad = as.factor(four_quad)) #three and four quad flags
+
+imgs <- imgs %>% mutate(num_quads = ifelse(one_quad==1,1, ifelse(two_quad==1,2, ifelse(three_quad==1,3, ifelse(four_quad==1,4,0))))) %>% mutate(num_quads = as.factor(num_quads)) #multi-level factor for num of quadrants involved
+```
+
+```{r histogram of affected quartiles}
+imgs2 %>% filter(!is.na(num_quads)) %>% ggplot(aes(Total, fill = num_quads)) + geom_histogram(bins = 16) +
+  xlab("Total CXR Score") + ggtitle("Distributon of affected quartiles") + scale_fill_brewer(palette="BuGn") + theme_linedraw()
+imgs2 %>% group_by(num_quads) %>% summarize(count = length(Subject_ID))
 ```
 
 ```{r in-hospital mortality, num of quad, warning=FALSE}
 #In-hospital mortality
-hosp_mort_numquads <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+one_quad+two_quad, family=binomial(link='logit'), data=imgs)
+hosp_mort_numquads <- glm(hosp_death ~ num_quads+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(hosp_mort_numquads)
 
 cbind(OR = exp(coef(hosp_mort_numquads)),
       exp(confint(hosp_mort_numquads)),
       p = coef(summary(hosp_mort_numquads))[,4])
 ```
+```{r Kaplan Meier num quads}
+cox_noq <- survfit(Surv(survival, censor) ~ num_quads, data=imgs)
 
+plot_noq <- ggsurvplot(cox_noq, data=imgs, #pval=TRUE, pval.size=3,
+           ggtheme = theme_minimal(), legend.title="#Quads", legend.labs=c("0","1","2","3","4"),
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
+           xlab="Months", font.legend=8, title="Survival by number of affected quadrants", font.title=10,
+           legend=c(1.1,0.6), risk.table.y.text=TRUE,
+           risk.table.fontsize=3, risk.table.title="") 
+plot_noq$plot <- plot_noq$plot + theme(plot.title = element_text(hjust = 0.5))
+plot_noq
+```
 
