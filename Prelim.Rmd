@@ -102,6 +102,17 @@ refdate <- as.Date("2018-09-15")
 imgs <- mutate(imgs, survival = ifelse(is.na(date_death) == TRUE, as.numeric(difftime(refdate, ICU_admit, units='days')), as.numeric(difftime(date_death, ICU_admit, units='days')))) %>% mutate(censor = ifelse(is.na(date_death) == TRUE, 0, 1))
 ```
 
+```{r create quartiles}
+#create quartiles
+imgs <- imgs %>% mutate(quartile = ntile(Total,4)) 
+imgs$quartile <- as.factor(imgs$quartile)
+```
+
+
+```{r 90 day mortality flad}
+imgs <- imgs %>% mutate(mort90d = ifelse(survival < 91 & !is.na(date_death),1,0)) %>% mutate(mort90d = as.factor(mort90d))
+```
+
 
 #In-hospital Mortality
 ##Logistic Regression
@@ -150,11 +161,11 @@ cbind(OR = exp(coef(hosp_mort_ards)),
 ```
 
 
-#28-day and 60-day mortality
+#28-day and 60-day and 90-day mortality
 ##Logistic Regression
 
 ```{r logit 28d mortality}
-one_month <- glm(mort28d ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+one_month <- glm(mort28d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(one_month)
 
 cbind(OR = exp(coef(one_month)),
@@ -162,15 +173,51 @@ cbind(OR = exp(coef(one_month)),
       p = coef(summary(one_month))[,4])
 ```
 
+```{r logit 28d mortality quartile}
+one_month_q <- glm(mort28d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(one_month_q)
+
+cbind(OR = exp(coef(one_month_q)),
+      exp(confint(one_month_q)),
+      p = coef(summary(one_month_q))[,4])
+```
+
 ```{r logit 60d mortality}
-two_month <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white, family=binomial(link='logit'), data=imgs)
+two_month <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(two_month)
 
 cbind(OR = exp(coef(two_month)),
       exp(confint(two_month)),
       p = coef(summary(two_month))[,4])
 
-imgs %>% filter(mort60d == 1) %>% summarize(count = length(Total))
+#imgs %>% filter(mort60d == 1) %>% summarize(count = length(Total))
+```
+
+```{r logit 60d mortality quartile}
+two_month_q <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(two_month_q)
+
+cbind(OR = exp(coef(two_month_q)),
+      exp(confint(two_month_q)),
+      p = coef(summary(two_month_q))[,4])
+```
+
+```{r logit 90d mortality}
+three_month <- glm(mort90d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(three_month)
+
+cbind(OR = exp(coef(three_month)),
+      exp(confint(three_month)),
+      p = coef(summary(three_month))[,4])
+```
+
+```{r logit 90d mortality quartile}
+three_month_q <- glm(mort90d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(three_month_q)
+
+cbind(OR = exp(coef(three_month_q)),
+      exp(confint(three_month_q)),
+      p = coef(summary(three_month_q))[,4])
 ```
 
 #Overall Mortality
@@ -201,11 +248,7 @@ plot(schoenfeld_res)
 ```
 
 ##Cox regression of entire cohort by quartile
-```{r quartiles}
-#create quartiles
-imgs <- imgs %>% mutate(quartile = ntile(Total,4)) 
-imgs$quartile <- as.factor(imgs$quartile)
-```
+
 ```{r cox all subjects by quartiles}
 #Cox regressions
 cox_qt <- survfit(Surv(survival, censor) ~ quartile, data=imgs) #for graph
