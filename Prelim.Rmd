@@ -108,11 +108,13 @@ imgs <- imgs %>% mutate(quartile = ntile(Total,4))
 imgs$quartile <- as.factor(imgs$quartile)
 ```
 
-
 ```{r 90 day mortality flag}
 imgs <- imgs %>% mutate(mort90d = ifelse(survival < 91 & !is.na(date_death),1,0)) %>% mutate(mort90d = as.factor(mort90d))
 ```
 
+```{r make non-ARDS}
+imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
+```
 
 #In-hospital Mortality
 ##Logistic Regression
@@ -137,9 +139,7 @@ cbind(OR = exp(coef(hosp_mort_phx)),
       p = coef(summary(hosp_mort_phx))[,4])
 ```
 
-```{r in-hosp non-ARDS}
-imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
-
+```{r in-hosp non ARDS}
 hosp_mort_non <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
 summary(hosp_mort_non)
 
@@ -189,6 +189,15 @@ summary(two_month)
 cbind(OR = exp(coef(two_month)),
       exp(confint(two_month)),
       p = coef(summary(two_month))[,4])
+```
+
+```{r logit 60d mortality non ARDS}
+two_month_non <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
+summary(two_month_non)
+
+cbind(OR = exp(coef(two_month_non)),
+      exp(confint(two_month_non)),
+      p = coef(summary(two_month_non))[,4])
 ```
 
 ```{r logit 60d mortality quartile}
