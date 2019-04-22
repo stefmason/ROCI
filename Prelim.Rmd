@@ -116,6 +116,10 @@ imgs <- imgs %>% mutate(mort90d = ifelse(survival < 91 & !is.na(date_death),1,0)
 imgs_non <- imgs %>% filter(Final_Dx != "ARDS" & Final_Dx != "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
 ```
 
+```{r make ARDS only cohort}
+imgs_ards <- imgs %>% filter(Final_Dx == "ARDS" | Final_Dx == "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
+```
+
 #In-hospital Mortality
 ##Logistic Regression
 
@@ -148,9 +152,8 @@ cbind(OR = exp(coef(hosp_mort_non)),
       p = coef(summary(hosp_mort_non))[,4])
 ```
 
-```{r in hosp ARDS only}
-imgs_ards <- imgs %>% filter(Final_Dx == "ARDS" | Final_Dx == "Sepsis/ARDS") %>% mutate(quartile = as.factor(ntile(Total,4)))
 
+```{r in hosp ARDS only}
 hosp_mort_ards <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_ards)
 summary(hosp_mort_ards)
 
@@ -209,6 +212,15 @@ cbind(OR = exp(coef(two_month_q)),
       p = coef(summary(two_month_q))[,4])
 ```
 
+```{r logit 60d mortality quartile non ards}
+two_month_qnon <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
+summary(two_month_qnon)
+
+cbind(OR = exp(coef(two_month_qnon)),
+      exp(confint(two_month_qnon)),
+      p = coef(summary(two_month_qnon))[,4])
+```
+
 ```{r logit 60d mortality intra-quartile comparisons}
 contrasts(imgs$quartile) <- contr.treatment(4, base=4)
 two_month_q_b4 <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
@@ -235,6 +247,34 @@ cbind(OR = exp(coef(two_month_q_b2)),
       p = coef(summary(two_month_q_b2))[,4])
 
 contrasts(imgs$quartile) <- contr.treatment(4, base=1)
+```
+
+```{r logit 60d mortality intra-quartile comparisons non ARDS}
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=4)
+two_month_q_b4_non <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
+summary(two_month_q_b4_non)
+
+cbind(OR = exp(coef(two_month_q_b4_non)),
+      exp(confint(two_month_q_b4_non)),
+      p = coef(summary(two_month_q_b4_non))[,4])
+
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=3)
+two_month_q_b3_non <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
+summary(two_month_q_b3_non)
+
+cbind(OR = exp(coef(two_month_q_b3_non)),
+      exp(confint(two_month_q_b3_non)),
+      p = coef(summary(two_month_q_b3_non))[,4])
+
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=2)
+two_month_q_b2_non <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
+summary(two_month_q_b2_non)
+
+cbind(OR = exp(coef(two_month_q_b2_non)),
+      exp(confint(two_month_q_b2_non)),
+      p = coef(summary(two_month_q_b2_non))[,4])
+
+contrasts(imgs_non$quartile) <- contr.treatment(4, base=1)
 ```
 
 ```{r logit 90d mortality}
@@ -337,7 +377,7 @@ summary(cox_qt_base1)
 
 ```{r Kaplan Meier all subjects}
 plot_all <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
-           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
+           ggtheme = theme_classic2(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
            xlab="Months", font.legend=8, title="Entire cohort", font.title=10,
@@ -345,6 +385,19 @@ plot_all <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
            risk.table.fontsize=3, risk.table.title="") 
 plot_all$plot <- plot_all$plot + theme(plot.title = element_text(hjust = 0.5))
 plot_all
+```
+
+
+```{r 60 day Kaplan meier}
+plot_60 <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
+           ggtheme = theme_classic2(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,60), break.x.by=5, ylab="",
+           xlab="Days", font.legend=8, title="Entire cohort", font.title=10,
+           legend=c(1.1,0.6), risk.table.y.text=FALSE,
+           risk.table.fontsize=3, risk.table.title="") 
+plot_60$plot <- plot_60$plot + theme(plot.title = element_text(hjust = 0.5))
+plot_60
 ```
 
 
@@ -387,7 +440,7 @@ summary(cox_non_base1)
 
 ```{r KM for non ARDS}
 plot_non <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3,
-           ggtheme = theme_minimal(), legend.title="Quartile", 
+           ggtheme = theme_classic2(), legend.title="Quartile", 
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
            xlab="Months", font.legend=8, title="Non-ARDS patients", font.title=10,
@@ -397,8 +450,27 @@ plot_non$plot <- plot_non$plot + theme(axis.text.y = element_blank(), plot.title
 plot_non
 ```
 
+```{r KM for non ARDS 60d}
+plot_non_60 <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3,
+           ggtheme = theme_classic2(), legend.title="Quartile", 
+           risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
+           xlim=c(0,60), break.time.by=5, ylab="",
+           xlab="Days", font.legend=8, title="Non-ARDS patients", font.title=10,
+           legend="none", risk.table.y.text=FALSE, 
+           risk.table.fontsize=3, risk.table.title="") 
+plot_non_60$plot <- plot_non_60$plot + theme(axis.text.y = element_blank(), plot.title = element_text(hjust = 0.5))
+plot_non_60
+```
+
 ##KM curves side by side
-```{r arrange the plots}
+```{r arrange the plots 60 day}
+KM_curves_60 <- list()
+KM_curves_60[[1]] <- plot_60
+KM_curves_60[[2]] <- plot_non_60
+arrange_ggsurvplots(KM_curves_60, print=TRUE, ncol=2, nrow=1)
+```
+
+```{r arrange the plots overall}
 KM_curves <- list()
 KM_curves[[1]] <- plot_all
 KM_curves[[2]] <- plot_non
