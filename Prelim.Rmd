@@ -377,7 +377,7 @@ summary(cox_qt_base1)
 
 ```{r Kaplan Meier all subjects}
 plot_all <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
-           ggtheme = theme_classic2(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
+           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
            xlab="Months", font.legend=8, title="Entire cohort", font.title=10,
@@ -390,7 +390,7 @@ plot_all
 
 ```{r 60 day Kaplan meier}
 plot_60 <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
-           ggtheme = theme_classic2(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
+           ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,60), break.x.by=5, ylab="",
            xlab="Days", font.legend=8, title="Entire cohort", font.title=10,
@@ -440,7 +440,7 @@ summary(cox_non_base1)
 
 ```{r KM for non ARDS}
 plot_non <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3,
-           ggtheme = theme_classic2(), legend.title="Quartile", 
+           ggtheme = theme_minimal(), legend.title="Quartile", 
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,3650), break.time.by=365.25, xscale="d_m", ylab="",
            xlab="Months", font.legend=8, title="Non-ARDS patients", font.title=10,
@@ -451,8 +451,9 @@ plot_non
 ```
 
 ```{r KM for non ARDS 60d}
+#for no lines use theme classic2, with lines, use minimal
 plot_non_60 <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3,
-           ggtheme = theme_classic2(), legend.title="Quartile", 
+           ggtheme = theme_minimal(), legend.title="Quartile", 
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,60), break.time.by=5, ylab="",
            xlab="Days", font.legend=8, title="Non-ARDS patients", font.title=10,
@@ -727,7 +728,7 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, log(value), color=variable)) +
   theme_minimal() + theme(plot.title = element_text(face = "bold")) +
   theme(panel.grid.minor = element_blank()) + 
   theme(legend.title = element_blank()) +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "top") +
   scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
 
 ```
