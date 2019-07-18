@@ -1,0 +1,24 @@
+---
+title: "Change in CXR Score"
+author: "Stefanie Mason"
+output: html_document
+---
+
+```{r setup}
+library(tidyverse)
+library(readxl)
+```
+```{r load data}
+#get COPD/CHF status
+med_hist <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "baseline_data", range = cell_cols(1:32))
+med_hist <- med_hist %>% dplyr::select(subj_id, heart_disease___2, copd) %>% rename(Subject_ID = subj_id) %>% mutate(chf = as.factor(heart_disease___2), copd = as.factor(copd)) %>% dplyr::select(-heart_disease___2)
+
+#get outcomes data
+outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:27))
+outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male)) %>% left_join(med_hist, by = "Subject_ID")
+
+#get imaging data
+imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_CW.xlsx", sheet = "Imaging_e", range = cell_cols(1:15))
+imgs <- imgs %>% dplyr::select(-day2, -day4, -day5, -day6, -day7) %>% filter(admit_cxr == 1) %>% left_join(outcomes, by = "Subject_ID") %>% filter(Final_Dx != "Control") 
+```
+
