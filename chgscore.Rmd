@@ -22,3 +22,7 @@ imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_CW.xlsx", sheet = "Imaging_e",
 imgs <- imgs %>% dplyr::select(-day2, -day4, -day5, -day6, -day7) %>% filter(admit_cxr == 1) %>% left_join(outcomes, by = "Subject_ID") %>% filter(Final_Dx != "Control") 
 ```
 
+```{r}
+
+```
+
