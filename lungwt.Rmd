@@ -42,8 +42,8 @@ summ
 ```
 
 ```{r scatterplot}
-weights %>% ggplot(aes(side_total, weight)) + geom_point() + geom_smooth(method = "lm") + xlab("CXR score") +
-  ylab("Weight (g)") + ggtitle("CXR score as a predictor of lung weight at autopsy")
+wt_plot <- weights %>% ggplot(aes(side_total, weight/1000)) + geom_jitter() + geom_smooth(method = "lm") + xlab("") +
+  ylab("Weight (kg)") + ggtitle("Lung weight at autopsy") + annotate("text", x=2.85, y=2, label="B=49.1 CI 18.8-79.5, p=0.002")
 ```
 
 

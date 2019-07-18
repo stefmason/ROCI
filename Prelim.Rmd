@@ -203,6 +203,15 @@ cbind(OR = exp(coef(two_month_non)),
       p = coef(summary(two_month_non))[,4])
 ```
 
+```{r logit 60d mortality ARDS only}
+two_month_ards <- glm(mort60d ~ Total+Age+Immsupp+APACHE+non_white+Male+copd+chf, family=binomial(link='logit'), data=imgs_ards)
+summary(two_month_ards)
+
+cbind(OR = exp(coef(two_month_ards)),
+      exp(confint(two_month_ards)),
+      p = coef(summary(two_month_ards))[,4])
+```
+
 ```{r logit 60d mortality quartile}
 two_month_q <- glm(mort60d ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(two_month_q)
@@ -389,7 +398,7 @@ plot_all
 
 
 ```{r 60 day Kaplan meier}
-plot_60 <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3,
+plot_60 <- ggsurvplot(cox_qt, data=imgs, pval=TRUE, pval.size=3, pval.coord=c(10,0.25),
            ggtheme = theme_minimal(), legend.title="Quartile", legend.labs=c("Q1","Q2","Q3","Q4"),
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,60), break.x.by=5, ylab="",
@@ -452,7 +461,7 @@ plot_non
 
 ```{r KM for non ARDS 60d}
 #for no lines use theme classic2, with lines, use minimal
-plot_non_60 <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3,
+plot_non_60 <- ggsurvplot(cox_all_non_strata, data=imgs_non, pval=TRUE, pval.size=3, pval.coord=c(10,0.25),
            ggtheme = theme_minimal(), legend.title="Quartile", 
            risk.table=TRUE, tables.height = 0.2, tables.theme = theme_cleantable(),
            xlim=c(0,60), break.time.by=5, ylab="",
@@ -478,7 +487,7 @@ KM_curves[[2]] <- plot_non
 arrange_ggsurvplots(KM_curves, print=TRUE, ncol=2, nrow=1)
 ```
 
-```{r in-hosp mort by quartile}
+```{r in-hosp mort by quartile, all}
 #std errors checked ->okay
 hosp_mort <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(hosp_mort)
@@ -488,7 +497,7 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
-```{r pairwise in-hosp quartile evaluation, message=FALSE}
+```{r pairwise in-hosp quartile evaluation, entire cohort, message=FALSE}
 contrasts(imgs$quartile) <- contr.treatment(4, base=2)
 inhosp_quart_base2 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(inhosp_quart_base2)
@@ -530,7 +539,9 @@ cbind(OR = exp(coef(hosp_mort_non_r1)),
       exp(confint(hosp_mort_non_r1)),
       p = coef(summary(hosp_mort_non_r1))[,4])
 ```
-```{r}
+
+
+```{r IQ comparisons, non-ARDS in hospital}
 #ref level =2
 contrasts(imgs_non$quartile) <- contr.treatment(4, base = 2)
 hosp_mort_non_r2 <- glm(hosp_death ~ quartile+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_non)
@@ -722,13 +733,15 @@ ggplot(meltplot) + geom_boxplot(aes(quartile, sqrt(value), color=variable)) +
   scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
 
 #Boxplot log scale
-ggplot(meltplot) + geom_boxplot(aes(quartile, log(value), color=variable)) +   
+ggplot(meltplot) + geom_boxplot(aes(quartile, log(value), color=variable, fill=variable)) +   
   scale_x_discrete(name="Chest Radiograph Score Quartile") + 
   scale_y_continuous(name="(Log of) Days", limits=c(0,5)) +
   theme_minimal() + theme(plot.title = element_text(face = "bold")) +
   theme(panel.grid.minor = element_blank()) + 
   theme(legend.title = element_blank()) +
-  theme(legend.position = "top") +
+  theme(legend.position = c(0.5,0.9)) + theme(legend.direction = "horizontal") +
+  theme(legend.text = element_text(size = 12)) +
+  theme(text=element_text(size=14)) + guides(fill=FALSE) +
   scale_color_discrete(labels=c("Length of stay", "Ventilator days"))
 
 ```
@@ -905,5 +918,12 @@ plot_noq <- ggsurvplot(cox_noq, data=imgs, #pval=TRUE, pval.size=3,
            risk.table.fontsize=3, risk.table.title="") 
 plot_noq$plot <- plot_noq$plot + theme(plot.title = element_text(hjust = 0.5))
 plot_noq
+```
+
+```{r freq of copd and chf}
+imgs %>% group_by(copd) %>% summarize(count = length(Total))
+imgs %>% group_by(chf) %>% summarize(count = length(Total))
+
+imgs %>% filter(is.na(copd))
 ```
 
