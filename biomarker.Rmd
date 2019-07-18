@@ -14,6 +14,7 @@ library(tidyverse)
 library(broom)
 library(data.table)
 library(olsrr)
+library(gridExtra)
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 ### Import data
@@ -65,17 +66,38 @@ sum_stat
 ### Visualize data
 ## Scatterplot
 ```{r scatterplot}
-biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate, score) %>% gather(marker, value, -score, na.rm=T) %>% 
-  ggplot(aes(score, value)) + geom_point() + scale_y_log10() + facet_grid(.~marker) + ylab("value (log scale)") + xlab("Total CXR score")
+biomarker %>% dplyr::select(IL18D0, nadh_copies, HMITO_38, HMITO_96, bglob, Lactate, Total) %>% gather(marker, value, -Total, na.rm=T) %>% 
+  ggplot(aes(Total, value)) + geom_point() + scale_y_log10() + facet_grid(.~marker) + ylab("value (log scale)") + xlab("Total CXR score")
 
 #To check the integrity of the gather, name the data and check against:
 #vert %>% group_by(marker) %>% summarize(count = length(marker)) #check that the gather did not lose any data
 ```
 
 ```{r scatterplot with log transforms}
-biomarker %>% dplyr::select(logIL18, lognadh, logbglob, score) %>% gather(marker, value, -score, na.rm=T) %>% 
-  ggplot(aes(score, value)) + geom_point() + facet_grid(.~marker) + ylab("value (log scale)") + xlab("Total CXR score") + geom_smooth(method = "lm")
+biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Total) %>% gather(marker, value, -Total, na.rm=T) %>% 
+  ggplot(aes(Total, value)) + geom_jitter() + facet_grid(.~marker) + ylab("value (log scale)") + xlab("Total CXR score") + geom_smooth(method = "lm")
 ```
+
+```{r scatterplot with different axis}
+nuc_plot <- biomarker %>% dplyr::select(logbglob, Total) %>%
+  ggplot(aes(Total, logbglob)) + geom_jitter() + ylab("(log) copies/microliter") + xlab("") + geom_smooth(method = "lm") + 
+  ggtitle("Nuclear DNA") + annotate("text", x=5, y=1, label="r=0.20, p=0.008") 
+nuc_plot
+
+mt_plot <- biomarker %>% dplyr::select(lognadh, Total) %>%
+  ggplot(aes(Total, lognadh)) + geom_jitter() + ylab("") + xlab("") + geom_smooth(method = "lm") + 
+  ggtitle("Mitochondrial DNA") + annotate("text", x=5, y=1, label="r=0.23, p=0.002")
+mt_plot
+
+IL18_plot <- biomarker %>% dplyr::select(logIL18, Total) %>%
+  ggplot(aes(Total, logIL18)) + geom_jitter() + xlab("") + geom_smooth(method = "lm") + ylab("(log) picograms/milliliter") + 
+  ggtitle("Interleukin-18") + annotate("text", x=5, y=1, label="r=0.09, p=0.219")
+IL18_plot
+```
+```{r multi-plot}
+grid.arrange(nuc_plot, mt_plot, IL18_plot, wt_plot, nrow=2, ncol=2)
+```
+
 
 ```{r scatter quartile}
 biomarker %>% dplyr::select(logIL18, lognadh, logbglob, quartile) %>% gather(marker, value, -quartile, na.rm=T) %>% 
@@ -112,21 +134,41 @@ biomarker %>% dplyr::select(logIL18, lognadh, logbglob, Lactate, Total) %>% gath
 <p>Since nadh represents mtDNA and bglob represents nucDNA, I can state that CXR severity associates with those. 
 
 ```{r spearman correlation}
-biomarker %>% dplyr::select(Total, lognadh) %>% cor(., use = "pairwise.complete.obs", method="spearman")
-biomarker %>% dplyr::select(Total, logbglob) %>% cor(., use = "pairwise.complete.obs", method="spearman")
+#biomarker %>% dplyr::select(Total, lognadh) %>% cor(., use = "pairwise.complete.obs", method="spearman")
+#biomarker %>% dplyr::select(Total, logbglob) %>% cor(., use = "pairwise.complete.obs", method="spearman")
 biomarker %>% dplyr::select(Total, logIL18) %>% cor(., use = "pairwise.complete.obs", method="spearman")
+
+mtDNA <- biomarker %>% dplyr::select(Total, lognadh) %>% filter(!is.na(lognadh))
+cor.test(mtDNA$Total, mtDNA$lognadh, method="spearman", alternative = "t")
+
+nucDNA <- biomarker %>% dplyr::select(Total, logbglob) %>% filter(!is.na(logbglob))
+cor.test(nucDNA$Total, nucDNA$logbglob, method="spearman", alternative = "t")
+
+IL18 <- biomarker %>% dplyr::select(Total, logIL18) %>% filter(!is.na(logIL18))
+cor.test(IL18$Total, IL18$logIL18, method="spearman", alternative = "t")
 ```
+
+```{r cohort of non-ARDS}
+biomarker_non <- biomarker %>% filter(Subject_ID %in% imgs_non$Subject_ID)
+```
+
+```{r}
+mtDNA <- biomarker_non %>% dplyr::select(Total, lognadh) %>% filter(!is.na(lognadh))
+cor.test(mtDNA$Total, mtDNA$lognadh, method="spearman", alternative = "t")
+
+nucDNA <- biomarker_non %>% dplyr::select(Total, logbglob) %>% filter(!is.na(logbglob))
+cor.test(nucDNA$Total, nucDNA$logbglob, method="spearman", alternative = "t")
+
+IL18 <- biomarker_non %>% dplyr::select(Total, logIL18) %>% filter(!is.na(logIL18))
+cor.test(IL18$Total, IL18$logIL18, method="spearman", alternative = "t")
+```
+
 
 ```{r pearson correlation}
 biomarker %>% dplyr::select(Total, lognadh) %>% cor(., use = "pairwise.complete.obs", method="pearson")
 biomarker %>% dplyr::select(Total, logbglob) %>% cor(., use = "pairwise.complete.obs", method="pearson")
 biomarker %>% dplyr::select(Total, logIL18) %>% cor(., use = "pairwise.complete.obs", method="pearson")
 ```
-
-```{r}
-biomarker %>% dplyr::select(Total, lognadh) %>% cor.test(., alternative = "two.sided", method = "pearson")
-```
-
 
 
 ###Controlling for APACHE score
