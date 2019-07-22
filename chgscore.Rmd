@@ -7,7 +7,9 @@ output: html_document
 ```{r setup}
 library(tidyverse)
 library(readxl)
+library(MASS)
 ```
+
 ```{r load data}
 #get COPD/CHF status
 med_hist <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "baseline_data", range = cell_cols(1:32))
@@ -15,14 +17,56 @@ med_hist <- med_hist %>% dplyr::select(subj_id, heart_disease___2, copd) %>% ren
 
 #get outcomes data
 outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Outcomes", range = cell_cols(1:27))
-outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male)) %>% left_join(med_hist, by = "Subject_ID")
+outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male)) %>% dplyr::select(-intub, -extub, -ICU_admit, -ICU_dc, -Hosp_admit, -Hosp_dc, -BMI, -imgs) %>% left_join(med_hist, by = "Subject_ID")
 
 #get imaging data
 imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_CW.xlsx", sheet = "Imaging_e", range = cell_cols(1:15))
-imgs <- imgs %>% dplyr::select(-day2, -day4, -day5, -day6, -day7) %>% filter(admit_cxr == 1) %>% left_join(outcomes, by = "Subject_ID") %>% filter(Final_Dx != "Control") 
+imgs <- imgs %>% dplyr::select(Subject_ID, admit_cxr, day3, Total) %>% 
+  filter(day3==1 | admit_cxr==1) %>% mutate(cxr_day = ifelse(admit_cxr==1,"day1","day3")) %>% 
+  dplyr::select(-admit_cxr, -day3) %>% spread(cxr_day, Total) %>% mutate(change = day1 - day3) %>%
+  left_join(outcomes, by = "Subject_ID") %>% 
+  filter(Final_Dx != "Control", !is.na(day1), !is.na(day3)) 
+
+#Final n = 296
+#If change is NEGATIVE, patient got WORSE
 ```
 
-```{r}
+```{r some stats}
+imgs %>% summarize(median = median(change), min = min(change), max = max(change), count=length(change))
+imgs <- imgs %>% mutate(quartile = ntile(change, 4))
+imgs %>% group_by(quartile) %>% summarize(count = length(quartile), min = min(change), max = max(change))
+```
 
+
+```{r change in score and in-hospital mortality}
+hosp_mort <- glm(hosp_death ~ change+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+```
+
+```{r 60day mortality and change in score}
+two_month <- glm(mort60d ~ change+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(two_month)
+
+cbind(OR = exp(coef(two_month)),
+      exp(confint(two_month)),
+      p = coef(summary(two_month))[,4])
+```
+
+```{r ICU days and change in score}
+ICUdays_nb <- glm.nb(ICU_days ~ change+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
+summary(ICUdays_nb)
+cbind(IRR = exp(coef(ICUdays_nb)), exp(confint(ICUdays_nb)))[2,]
+```
+
+```{r days MV and change in score}
+intub = imgs %>% filter(days_MV >0)
+
+MVdays_nb <- glm.nb(days_MV ~ change+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
+summary(MVdays_nb)
+cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
 ```
 
