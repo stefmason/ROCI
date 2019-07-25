@@ -1,7 +1,7 @@
 ---
 title: "Change in CXR Score"
 author: "Stefanie Mason"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup}
@@ -37,6 +37,16 @@ imgs <- imgs %>% mutate(quartile = ntile(change, 4))
 imgs %>% group_by(quartile) %>% summarize(count = length(quartile), min = min(change), max = max(change))
 ```
 
+```{r absolute value of the magnitude of change}
+imgs <- imgs %>% mutate(chg_abs = abs(change), q_abs = ntile(chg_abs, 4)) 
+imgs %>% group_by(q_abs) %>% summarise(count = length(q_abs), min = min(chg_abs), max = max(chg_abs))
+```
+
+```{r}
+imgs %>% summarise(median = median(ICU_days), min = min(ICU_days), max = max(ICU_days))
+imgs %>% group_by(Immsupp) %>% summarize(count = length(Immsupp))
+```
+
 
 ```{r change in score and in-hospital mortality}
 hosp_mort <- glm(hosp_death ~ change+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
@@ -47,6 +57,16 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
+```{r}
+hosp_mort_t <- glm(hosp_death ~ day1+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort_t)
+
+cbind(OR = exp(coef(hosp_mort_t)),
+      exp(confint(hosp_mort_t)),
+      p = coef(summary(hosp_mort_t))[,4])
+```
+
+
 ```{r 60day mortality and change in score}
 two_month <- glm(mort60d ~ change+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
 summary(two_month)
@@ -55,6 +75,16 @@ cbind(OR = exp(coef(two_month)),
       exp(confint(two_month)),
       p = coef(summary(two_month))[,4])
 ```
+
+```{r}
+two_month_t <- glm(mort60d ~ day1+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(two_month_t)
+
+cbind(OR = exp(coef(two_month_t)),
+      exp(confint(two_month_t)),
+      p = coef(summary(two_month_t))[,4])
+```
+
 
 ```{r ICU days and change in score}
 ICUdays_nb <- glm.nb(ICU_days ~ change+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=imgs)
@@ -68,5 +98,39 @@ intub = imgs %>% filter(days_MV >0)
 MVdays_nb <- glm.nb(days_MV ~ change+APACHE+Age+non_white+Male+Immsupp+copd+chf, data=intub)
 summary(MVdays_nb)
 cbind(IRR = exp(coef(MVdays_nb)), exp(confint(MVdays_nb)))[2,]
+```
+
+```{r looking just at the CHF people}
+chf <- imgs %>% filter(chf==1)
+
+chf_mort <- glm(hosp_death ~ change+Male+Age+Immsupp+APACHE, family=binomial(link='logit'), data=imgs)
+summary(chf_mort)
+
+cbind(OR = exp(coef(chf_mort)),
+      exp(confint(chf_mort)),
+      p = coef(summary(chf_mort))[,4])
+```
+
+```{r ards only}
+ards <- imgs %>% filter(Final_Dx=="ARDS" | Final_Dx=="Sepsis/ARDS")
+
+ards_mort <- glm(hosp_death ~ change+Male+Age+Immsupp+APACHE, family=binomial(link='logit'), data=imgs)
+summary(ards_mort)
+
+cbind(OR = exp(coef(ards_mort)),
+      exp(confint(ards_mort)),
+      p = coef(summary(ards_mort))[,4])
+```
+
+```{r}
+#binary =1 for CXR score improvement or non-progression
+imgs <- imgs %>% mutate(binary = ifelse(change >= 0,1,0))
+
+hosp_mort <- glm(hosp_death ~ binary+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
 ```
 
