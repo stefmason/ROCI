@@ -134,3 +134,28 @@ cbind(OR = exp(coef(hosp_mort)),
       p = coef(summary(hosp_mort))[,4])
 ```
 
+```{r spaghetti plot data}
+change <- imgs %>% dplyr::select(Subject_ID, change)
+
+#prep data
+spag_imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_CW.xlsx", sheet = "Imaging_e", range = cell_cols(1:15))
+spag_imgs <- spag_imgs %>% dplyr::select(Subject_ID, admit_cxr, day3, Total) %>% 
+  filter(day3==1 | admit_cxr==1) %>% mutate(cxr_day = ifelse(admit_cxr==1,"day1","day3")) %>% 
+  dplyr::select(-admit_cxr, -day3) %>% left_join(change) %>% mutate(sign = as.factor(ifelse(change > 0, 1, ifelse(change==0,2,0))))
+
+```
+
+```{r and the plot itself}
+interaction.plot(spag_imgs$cxr_day, spag_imgs$Subject_ID, spag_imgs$Total, xlab = "ICU Day", ylab = "Total CXR score", legend = FALSE)
+```
+```{r}
+spag_imgs %>% ggplot(aes(x=cxr_day, y=Total, group = Subject_ID, color=sign)) + geom_line() + theme_bw() +
+  scale_color_discrete(name = "Change", labels = c("Worsened", "Improved", "No change")) +
+  xlab("ICU day") + ylab("Total CXR Score") + ggtitle("Change in CXR between ICU admission and day 3")
+```
+
+```{r}
+imgs %>% ggplot(aes(change, color=hosp_death, fill=hosp_death)) + geom_histogram(bins=20) + theme_linedraw() + scale_fill_discrete(name="Vital Status at Discharge", labels = c("Alive", "Dead")) + theme(legend.position="bottom") +
+  guides(color=FALSE) + xlab("Change in Total CXR score") + ggtitle("Histogram of change in CXR score") 
+```
+
