@@ -36,9 +36,24 @@ differ <- ratings %>% filter(Total-score > 2 | score-Total > 2)
 ```
 
 ```{r how many are different?}
-#69 of 172 scores were different
-imgs_sam %>% filter(Total != score) %>% dplyr::select(Subject_ID, Total, score)
+#93 of 222 scores were different
+differ <- ratings %>% filter(Total != score) %>% dplyr::select(Subject_ID, Total, score)
 ```
+
+```{r quartiles in sam's data}
+imgs_sam <- imgs_sam %>% mutate(quartile = as.factor(ntile(score,4)), qtile = as.factor(ntile(Total, 4)))
+```
+
+```{r summary stats}
+imgs_sam %>% group_by(quartile) %>% summarise(min = min(score), max = max(score))
+median(imgs_sam$score)
+imgs_sam %>% ggplot(aes(score, fill=quartile)) + geom_histogram(bins=15)
+
+imgs_sam %>% group_by(qtile) %>% summarise(min = min(Total), max = max(Total))
+median(imgs_sam$Total)
+imgs_sam %>% ggplot(aes(Total, fill=qtile)) + geom_histogram(bins=15)
+```
+
 
 Calculating an ICC (two-way, consistency, with 95% confidence):
 ```{r ICC with IRR package}
@@ -140,6 +155,23 @@ cox_all_sam <- coxph(Surv(survival, censor) ~ Male+Age+non_white+APACHE+Immsupp+
 summary(cox_all_sam)
 ```
 
+```{r 60 day mortality, mine vs Sam}
+#my original
+mort_60d <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(mort_60d)
+
+cbind(OR = exp(coef(mort_60d)),
+      exp(confint(mort_60d)),
+      p = coef(summary(mort_60d))[,4])
+
+#with sam's data
+mort_60d_sam <- glm(mort60d ~ score+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_sam)
+summary(mort_60d_sam)
+
+cbind(OR = exp(coef(mort_60d_sam)),
+      exp(confint(mort_60d_sam)),
+      p = coef(summary(mort_60d_sam))[,4])
+```
 
 
 ##NOT USED

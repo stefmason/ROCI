@@ -29,9 +29,10 @@ outcomes <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Out
 imgs <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "Imaging", range = cell_cols(1:11))
 med_hist <- read_excel("~/Documents/ROCIanalysis/ROCI_101918.xlsx", sheet = "baseline_data", range = cell_cols(1:32))
 ```
+
 ```{r more prep}
 #RWarngle data
-med_hist <- med_hist %>% dplyr::select(subj_id, heart_disease___2, copd) %>% rename(Subject_ID = subj_id) %>% mutate(chf = as.factor(heart_disease___2), copd = as.factor(copd)) %>% dplyr::select(-heart_disease___2)
+med_hist <- med_hist %>% dplyr::select(subj_id, heart_disease___2, copd) %>% dplyr::rename(Subject_ID = subj_id) %>% mutate(chf = as.factor(heart_disease___2), copd = as.factor(copd)) %>% dplyr::select(-heart_disease___2)
 
 outcomes <- outcomes %>% mutate(non_white = as.factor(ifelse(Race == "White, non-Hispanic origin", 0, 1)), hosp_death = as.factor(ifelse(DC_coded == 0 | DC_coded == 1, 1, 0)), Immsupp = as.factor(Immsupp), Male = as.factor(Male)) %>% left_join(med_hist, by = "Subject_ID")
 

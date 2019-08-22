@@ -83,6 +83,17 @@ cbind(OR = exp(coef(hosp_mort_ards)),
       p = coef(summary(hosp_mort_ards))[,4])
 ```
 
+```{r in hosp sepsis only}
+hosp_mort_sepsis <- imgs %>% filter(Final_Dx == "Sepsis") %>%
+  glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=.)
+summary(hosp_mort_sepsis)
+
+cbind(OR = exp(coef(hosp_mort_sepsis)),
+      exp(confint(hosp_mort_sepsis)),
+      p = coef(summary(hosp_mort_sepsis))[,4])
+```
+
+
 ```{r in those with hx of CHF}
 hosp_mort_chf <- imgs %>% filter(chf == 1) %>% 
   glm(hosp_death ~ Total+APACHE, family=binomial(link='logit'), data=.)
