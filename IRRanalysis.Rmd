@@ -173,6 +173,47 @@ cbind(OR = exp(coef(mort_60d_sam)),
       p = coef(summary(mort_60d_sam))[,4])
 ```
 
+```{r remove OSH images}
+imgs_no_osh <- subset(imgs, !(Subject_ID %in% c(144, 231, 283, 376, 448, 568)))
+```
+
+```{r in hospital mortality wo osh}
+#my original
+hosp_mort <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(hosp_mort)
+
+cbind(OR = exp(coef(hosp_mort)),
+      exp(confint(hosp_mort)),
+      p = coef(summary(hosp_mort))[,4])
+
+#with sam's data
+hosp_mort_osh <- glm(hosp_death ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_no_osh)
+summary(hosp_mort_osh)
+
+cbind(OR = exp(coef(hosp_mort_osh)),
+      exp(confint(hosp_mort_osh)),
+      p = coef(summary(hosp_mort_osh))[,4])
+```
+
+```{r 60 day mort wo osh}
+#my original
+mort_60d <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs)
+summary(mort_60d)
+
+cbind(OR = exp(coef(mort_60d)),
+      exp(confint(mort_60d)),
+      p = coef(summary(mort_60d))[,4])
+
+#with sam's data
+mort_60d_osh <- glm(mort60d ~ Total+Male+Age+Immsupp+APACHE+non_white+copd+chf, family=binomial(link='logit'), data=imgs_no_osh)
+summary(mort_60d_osh)
+
+cbind(OR = exp(coef(mort_60d_osh)),
+      exp(confint(mort_60d_osh)),
+      p = coef(summary(mort_60d_osh))[,4])
+```
+
+
 
 ##NOT USED
 
